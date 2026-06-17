@@ -1,0 +1,105 @@
+"""DAG assignment corpus and critic metadata propagation."""
+
+from __future__ import annotations
+
+from computer_use_agent.catalog import (
+    assignment_payload,
+    load_assignment_queries,
+    validate_assignment_corpus,
+)
+from computer_use_agent.dag_schemas import NodeSpec, PlannerOutput
+from computer_use_agent.flow import Graph
+from computer_use_agent.skills import SkillRegistry
+
+EXPECTED_BROWSER_IDS = {"COMP", "DEAL", "TICKET", "STACK", "FORGE", "B1", "B2", "B3", "B4"}
+EXPECTED_COMPUTER_IDS = {"CU-CALC", "CU-CURSOR", "CU-CANVAS"}
+EXPECTED_IDS = EXPECTED_BROWSER_IDS | EXPECTED_COMPUTER_IDS
+
+
+def test_assignment_corpus_has_all_browser_queries():
+    rows = load_assignment_queries()
+    ids = {str(r["id"]) for r in rows}
+    assert ids == EXPECTED_IDS
+    parts = {int(r["part"]) for r in rows if r.get("part")}
+    assert parts == {1, 9}
+
+
+def test_critic_splice_propagates_required_keys():
+    reg = SkillRegistry()
+    g = Graph(reg)
+    p = g.add_node_from_spec(NodeSpec(skill="planner", metadata={"label": "p"}))
+    output = PlannerOutput(
+        rationale="validate json",
+        nodes=[
+            NodeSpec(
+                skill="distiller",
+                inputs=["USER_QUERY"],
+                metadata={
+                    "label": "d1",
+                    "required_keys": "author,title,year",
+                    "verbatim_json": True,
+                },
+            ),
+            NodeSpec(skill="formatter", inputs=["n:d1"], metadata={"label": "out"}),
+        ],
+    )
+    g.extend_from(p, output)
+    critics = [d for _, d in g.dg.nodes(data=True) if d.get("skill") == "critic"]
+    assert len(critics) == 1
+    assert critics[0]["metadata"].get("required_keys") == "author,title,year"
+
+
+def test_calculator_skill_registered():
+    reg = SkillRegistry()
+    assert reg.get("calculator").tools_allowed == ["safe_calculate"]
+
+
+def test_prosody_analyst_skill_registered():
+    reg = SkillRegistry()
+    assert reg.get("prosody_analyst").tools_allowed == ["count_syllables"]
+
+
+def test_computer_skill_registered():
+    reg = SkillRegistry()
+    skill = reg.get("computer")
+    assert skill.tools_allowed == []
+    assert "start_recording" in skill.description
+
+
+def test_assignment_payload():
+    payload = assignment_payload()
+    assert payload["query_count"] == 12
+    assert payload["log_dir"] == "logs/dag"
+    design = payload.get("design_queries") or []
+    assert len(design) == 2
+    assert {d["kind"] for d in design} == {"browser", "computer"}
+    assert payload.get("browser_only") is False
+    assert len(payload.get("groups") or []) == 5
+    assert payload.get("browser_reference_runs")
+    assert payload.get("computer_reference_runs")
+    outline = payload["outline"]
+    assert outline[0]["query_ids"] == ["COMP"]
+    assert outline[1]["query_ids"] == ["DEAL", "TICKET"]
+    assert outline[2]["query_ids"] == ["STACK", "FORGE"]
+    assert outline[3]["query_ids"] == ["B1", "B2", "B3", "B4"]
+    assert outline[4]["query_ids"] == ["CU-CALC", "CU-CURSOR", "CU-CANVAS"]
+
+
+def test_assignment_corpus_validates():
+    assert validate_assignment_corpus() == []
+
+
+def test_course_example_queries():
+    """Four comparison tasks match the course assignment brief."""
+    by_id = {str(r["id"]): r for r in load_assignment_queries()}
+    assert by_id["COMP"]["course_example"] is True
+    assert by_id["DEAL"]["course_example"] is True
+    assert by_id["STACK"]["course_example"] is True
+    assert by_id["FORGE"]["course_example"] is True
+    assert all(int(by_id[q]["min_browser_actions"]) >= 3 for q in ("COMP", "DEAL", "STACK", "FORGE"))
+    assert "₹80,000" in by_id["DEAL"]["query"]
+    assert "5 AI coding tools" in by_id["STACK"]["query"]
+    assert "text-generation" in by_id["COMP"]["query"].lower()
+    assert "5 CNC/VMC" in by_id["FORGE"]["query"]
+    spec = assignment_payload()
+    assert len(spec.get("course_examples") or []) == 4

@@ -1,0 +1,454 @@
+"""Persistence, recovery classification, and critic splice tests."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import pickle
+
+import networkx as nx
+import pytest
+
+from computer_use_agent.dag_schemas import AgentResult, NodeSpec, NodeState, NodeStatus, PlannerOutput
+from computer_use_agent.flow import CRITIC_FAIL_CAP, Executor, Graph
+from computer_use_agent.persistence import SessionLoadError, SessionStore, node_filename, node_id_from_filename
+from computer_use_agent.recovery import classify_failure
+from computer_use_agent.skills import SkillRegistry
+
+# --- classify_failure (pinned gateway error strings) ---------------------------------
+
+@pytest.mark.parametrize(
+    "error,expected",
+    [
+        ("HTTP 503 Service Unavailable", "transient"),
+        ("upstream returned 502 Bad Gateway", "transient"),
+        ("504 Gateway Timeout from worker", "transient"),
+        ("request timeout after 120s", "transient"),
+        ("connection reset by peer", "transient"),
+        ("ConnectionError: failed to connect", "transient"),
+        ("HTTPStatusError: 503", "transient"),
+        ("service unavailable — try again", "transient"),
+        ("malformed JSON in planner output", "validation_error"),
+        ("1 validation error for NodeSpec", "validation_error"),
+        ("ValidationError: field required", "validation_error"),
+        ("JSON validation error at nodes[0]", "validation_error"),
+        ("distiller produced wrong field types", "upstream_failure"),
+        ("KeyError: 'population'", "upstream_failure"),
+        ("sandbox exit code 1", "upstream_failure"),
+        ("unexpected tool response", "upstream_failure"),
+        ("empty researcher output", "upstream_failure"),
+        ("RuntimeError: formatter missing", "upstream_failure"),
+    ],
+)
+def test_classify_failure(error: str, expected: str):
+    assert classify_failure(error) == expected
+
+
+def test_classify_failure_case_insensitive_timeout():
+    assert classify_failure("TIMEOUT waiting for gateway") == "transient"
+
+
+def test_plan_recovery_skips_missing_python_modules():
+    from computer_use_agent.recovery import plan_recovery
+
+    decision = plan_recovery(
+        failed_skill="browser",
+        error_text="No module named 'trafilatura'",
+        failed_node_id="n:2",
+    )
+    assert decision.action == "skip"
+    assert decision.reason == "missing_dependency"
+
+
+def test_plan_recovery_skips_missing_playwright_browser():
+    from computer_use_agent.recovery import plan_recovery
+
+    decision = plan_recovery(
+        failed_skill="browser",
+        error_text=(
+            "BrowserType.launch: Executable doesn't exist at "
+            "/root/.cache/ms-playwright/chromium_headless_shell-1217/..."
+        ),
+        failed_node_id="n:2",
+    )
+    assert decision.action == "skip"
+    assert decision.reason == "missing_dependency"
+
+
+def test_plan_recovery_skips_all_browser_failures():
+    from computer_use_agent.recovery import plan_recovery
+
+    decision = plan_recovery(
+        failed_skill="browser",
+        error_text="selector #price not found on product grid",
+        failed_node_id="n:12",
+    )
+    assert decision.action == "skip"
+    assert decision.reason == "browser_exhausted"
+
+
+def test_plan_recovery_skips_browser_cascade_exhausted():
+    from computer_use_agent.recovery import plan_recovery
+
+    decision = plan_recovery(
+        failed_skill="browser",
+        error_text="All browser layers failed; comparison task requires ≥3 visible actions.",
+        failed_node_id="n:12",
+    )
+    assert decision.action == "skip"
+    assert decision.reason == "browser_exhausted"
+
+
+def test_plan_recovery_skips_computer_wsl_driver_setup():
+    from computer_use_agent.recovery import is_computer_environment_error, plan_recovery
+
+    decision = plan_recovery(
+        failed_skill="computer",
+        error_text="Linux cua-driver cannot run in this WSL2 image because GLIBC_2.39 is missing.",
+        failed_node_id="n:2",
+    )
+    assert decision.action == "skip"
+    assert decision.reason == "computer_environment"
+    assert is_computer_environment_error(
+        "CuaDriverError: cua-driver click failed (1): Element 32 not in cache for hwnd=919628."
+    ) is False
+
+
+# --- critic splice (4 tests) -------------------------------------------------------
+
+def _distiller_planner_output() -> PlannerOutput:
+    return PlannerOutput(
+        rationale="extract",
+        nodes=[
+            NodeSpec(skill="distiller", inputs=["USER_QUERY"], metadata={"label": "d"}),
+            NodeSpec(skill="formatter", inputs=["n:d"], metadata={"label": "out"}),
+        ],
+    )
+
+
+def test_auto_inserted_critic_path_target_and_child_ids():
+    reg = SkillRegistry()
+    g = Graph(reg)
+    p = g.add_node_from_spec(NodeSpec(skill="planner", metadata={"label": "p"}))
+    g.extend_from(p, _distiller_planner_output())
+    critics = [n for n, d in g.dg.nodes(data=True) if d.get("skill") == "critic"]
+    assert len(critics) == 1
+    meta = g.dg.nodes[critics[0]]["metadata"]
+    assert meta.get("target") == meta.get("child")
+
+
+def test_planner_emitted_critic_not_doubled():
+    reg = SkillRegistry()
+    g = Graph(reg)
+    p = g.add_node_from_spec(NodeSpec(skill="planner", metadata={"label": "p"}))
+    output = PlannerOutput(
+        rationale="constrained write",
+        nodes=[
+            NodeSpec(skill="distiller", inputs=["USER_QUERY"], metadata={"label": "d"}),
+            NodeSpec(
+                skill="critic",
+                inputs=["n:d"],
+                metadata={"label": "crit", "target": "out", "child": "out", "question": "4-6-4 syllables"},
+            ),
+            NodeSpec(skill="formatter", inputs=["n:crit"], metadata={"label": "out"}),
+        ],
+    )
+    g.extend_from(p, output)
+    assert sum(1 for _, d in g.dg.nodes(data=True) if d.get("skill") == "critic") == 1
+
+
+def test_critic_fail_recovery_cap_per_target():
+    async def _run() -> None:
+        ex = Executor(registry=SkillRegistry())
+        g = ex.graph
+        d = g.add_node_from_spec(NodeSpec(skill="distiller", metadata={"label": "d"}))
+        c = g.add_node_from_spec(
+            NodeSpec(skill="critic", inputs=["n:d"], metadata={"label": "crit", "target": "out", "child": "out"})
+        )
+        f = g.add_node_from_spec(NodeSpec(skill="formatter", inputs=["n:crit"], metadata={"label": "out"}))
+        g.dg.add_edge(d, c)
+        g.dg.add_edge(c, f)
+        ex.states = {
+            d: NodeState(node_id=d, skill="distiller", status=NodeStatus.complete, output="{}"),
+            c: NodeState(node_id=c, skill="critic", status=NodeStatus.complete),
+            f: NodeState(node_id=f, skill="formatter", status=NodeStatus.pending),
+        }
+        fail_json = '{"verdict": "fail", "rationale": "syllable mismatch"}'
+        await ex._handle_critic(c, fail_json)
+        assert sum(1 for _, nd in g.dg.nodes(data=True) if nd.get("skill") == "planner") == 1
+        ex.graph.critic_fail_counts["out"] = CRITIC_FAIL_CAP
+        await ex._handle_critic(c, fail_json)
+        assert sum(1 for _, nd in g.dg.nodes(data=True) if nd.get("skill") == "planner") == 1
+
+    asyncio.run(_run())
+
+
+def test_critic_global_recovery_planner_cap():
+    async def _run() -> None:
+        ex = Executor(registry=SkillRegistry())
+        g = ex.graph
+        g.add_node_from_spec(NodeSpec(skill="planner", metadata={"label": "recovery_1", "recovery": True}))
+        d = g.add_node_from_spec(NodeSpec(skill="distiller", metadata={"label": "d2"}))
+        c = g.add_node_from_spec(
+            NodeSpec(
+                skill="critic",
+                inputs=["n:d2"],
+                metadata={"label": "crit2", "target": "out2", "child": "out2"},
+            )
+        )
+        f = g.add_node_from_spec(NodeSpec(skill="formatter", inputs=["n:crit2"], metadata={"label": "out2"}))
+        g.dg.add_edge(d, c)
+        g.dg.add_edge(c, f)
+        ex.states = {
+            d: NodeState(node_id=d, skill="distiller", status=NodeStatus.complete, output="{}"),
+            c: NodeState(node_id=c, skill="critic", status=NodeStatus.complete),
+            f: NodeState(node_id=f, skill="formatter", status=NodeStatus.pending),
+        }
+        fail_json = '{"verdict": "fail", "rationale": "missing laptop rows"}'
+        await ex._handle_critic(c, fail_json)
+        assert sum(1 for _, nd in g.dg.nodes(data=True) if nd.get("skill") == "planner") == 1
+        assert ex.states[f].status == NodeStatus.pending
+
+    asyncio.run(_run())
+
+
+def test_critic_pass_leaves_graph_unchanged():
+    async def _run() -> None:
+        ex = Executor(registry=SkillRegistry())
+        g = ex.graph
+        c = g.add_node_from_spec(NodeSpec(skill="critic", metadata={"label": "crit", "target": "out", "child": "out"}))
+        f = g.add_node_from_spec(NodeSpec(skill="formatter", inputs=["n:crit"], metadata={"label": "out"}))
+        g.dg.add_edge(c, f)
+        ex.states = {
+            c: NodeState(node_id=c, skill="critic", status=NodeStatus.complete),
+            f: NodeState(node_id=f, skill="formatter", status=NodeStatus.pending),
+        }
+        before = g.dg.number_of_nodes()
+        await ex._handle_critic(c, '{"verdict": "pass", "rationale": "ok"}')
+        assert g.dg.number_of_nodes() == before
+        assert ex.states[f].status == NodeStatus.pending
+
+    asyncio.run(_run())
+
+
+# --- recovery classifier integration -------------------------------------------------
+
+def _executor_with_store(tmp_path, monkeypatch, *, sid: str = "recovery_test"):
+    from computer_use_agent import persistence as pers_mod
+    from computer_use_agent.persistence import SessionStore
+
+    monkeypatch.setattr(pers_mod, "SESSIONS_DIR", tmp_path / "sessions")
+    store = SessionStore(sid)
+    store.save_query("test")
+    ex = Executor(registry=SkillRegistry())
+    ex.store = store
+    return ex, store
+
+
+def test_transient_failure_does_not_queue_recovery_planner(tmp_path, monkeypatch):
+    async def _run() -> None:
+        ex, store = _executor_with_store(tmp_path, monkeypatch)
+        nid = ex.graph.add_node_from_spec(NodeSpec(skill="researcher", metadata={"label": "r1"}))
+        store.save_graph(ex.graph.dg)
+        st = NodeState(node_id=nid, skill="researcher", status=NodeStatus.running)
+        ex.states[nid] = st
+        before = ex.graph.dg.number_of_nodes()
+        await ex._handle_node_failure(nid, "researcher", "HTTP 503 Service Unavailable", st)
+        assert ex.graph.dg.number_of_nodes() == before
+        assert ex._fatal_error is not None
+
+    asyncio.run(_run())
+
+
+def test_upstream_failure_queues_one_recovery_planner(tmp_path, monkeypatch):
+    async def _run() -> None:
+        ex, store = _executor_with_store(tmp_path, monkeypatch)
+        nid = ex.graph.add_node_from_spec(NodeSpec(skill="distiller", metadata={"label": "d"}))
+        store.save_graph(ex.graph.dg)
+        st = NodeState(node_id=nid, skill="distiller", status=NodeStatus.running)
+        ex.states[nid] = st
+        await ex._handle_node_failure(nid, "distiller", "wrong schema in output", st)
+        assert ex._fatal_error is None
+        planners = [n for n, d in ex.graph.dg.nodes(data=True) if d.get("skill") == "planner"]
+        assert len(planners) == 1
+        meta = ex.graph.dg.nodes[planners[0]]["metadata"]
+        assert meta.get("failure_report", {}).get("skill") == "distiller"
+
+    asyncio.run(_run())
+
+
+def test_recovery_planner_ready_after_failed_browser_skips_branch(tmp_path, monkeypatch):
+    async def _run() -> None:
+        ex, store = _executor_with_store(tmp_path, monkeypatch)
+        p = ex.graph.add_node_from_spec(NodeSpec(skill="planner", metadata={"label": "p"}))
+        b = ex.graph.add_node_from_spec(NodeSpec(skill="browser", metadata={"label": "browse"}))
+        d = ex.graph.add_node_from_spec(
+            NodeSpec(skill="distiller", inputs=["n:browse"], metadata={"label": "d"})
+        )
+        f = ex.graph.add_node_from_spec(NodeSpec(skill="formatter", inputs=["n:d"], metadata={"label": "out"}))
+        ex.graph.dg.add_edge(p, b)
+        ex.graph.dg.add_edge(b, d)
+        ex.graph.dg.add_edge(d, f)
+        ex.states = {
+            p: NodeState(node_id=p, skill="planner", status=NodeStatus.complete),
+            b: NodeState(node_id=b, skill="browser", status=NodeStatus.running),
+            d: NodeState(node_id=d, skill="distiller", status=NodeStatus.pending),
+            f: NodeState(node_id=f, skill="formatter", status=NodeStatus.pending),
+        }
+        await ex._handle_node_failure(b, "browser", "selector #price not found on product grid", ex.states[b])
+        recovery_ids = [
+            n
+            for n, nd in ex.graph.dg.nodes(data=True)
+            if nd.get("skill") == "planner" and n != p
+        ]
+        assert recovery_ids == []
+        researchers = [n for n, nd in ex.graph.dg.nodes(data=True) if nd.get("skill") == "researcher"]
+        assert len(researchers) == 1
+        assert ex.states[d].status == NodeStatus.skipped
+        assert ex.states[f].status == NodeStatus.skipped
+        assert researchers[0] in ex.graph.ready_nodes(ex.states)
+
+    asyncio.run(_run())
+
+
+def test_browser_cascade_exhausted_does_not_replan(tmp_path, monkeypatch):
+    async def _run() -> None:
+        ex, store = _executor_with_store(tmp_path, monkeypatch)
+        p = ex.graph.add_node_from_spec(NodeSpec(skill="planner", metadata={"label": "p"}))
+        b = ex.graph.add_node_from_spec(NodeSpec(skill="browser", metadata={"label": "browse"}))
+        ex.graph.dg.add_edge(p, b)
+        ex.states = {
+            p: NodeState(node_id=p, skill="planner", status=NodeStatus.complete),
+            b: NodeState(node_id=b, skill="browser", status=NodeStatus.running),
+        }
+        await ex._handle_node_failure(
+            b,
+            "browser",
+            "All browser layers failed; comparison task requires ≥3 visible actions.",
+            ex.states[b],
+        )
+        recovery_ids = [
+            n for n, nd in ex.graph.dg.nodes(data=True) if nd.get("skill") == "planner" and n != p
+        ]
+        assert recovery_ids == []
+        assert ex._fatal_error is None
+        researchers = [n for n, nd in ex.graph.dg.nodes(data=True) if nd.get("skill") == "researcher"]
+        distillers = [n for n, nd in ex.graph.dg.nodes(data=True) if nd.get("skill") == "distiller"]
+        formatters = [n for n, nd in ex.graph.dg.nodes(data=True) if nd.get("skill") == "formatter"]
+        assert len(researchers) == 1
+        assert len(distillers) == 1
+        assert len(formatters) == 1
+        assert researchers[0] in ex.graph.ready_nodes(ex.states)
+
+    asyncio.run(_run())
+
+
+def test_browser_failure_queues_researcher_fallback(tmp_path, monkeypatch):
+    async def _run() -> None:
+        ex, store = _executor_with_store(tmp_path, monkeypatch)
+        p = ex.graph.add_node_from_spec(NodeSpec(skill="planner", metadata={"label": "p"}))
+        b1 = ex.graph.add_node_from_spec(NodeSpec(skill="browser", metadata={"label": "browse1"}))
+        ex.graph.dg.add_edge(p, b1)
+        ex.states = {
+            p: NodeState(node_id=p, skill="planner", status=NodeStatus.complete),
+            b1: NodeState(node_id=b1, skill="browser", status=NodeStatus.running),
+        }
+        await ex._handle_node_failure(
+            b1, "browser", "All browser layers failed.", ex.states[b1]
+        )
+        researchers = [n for n, nd in ex.graph.dg.nodes(data=True) if nd.get("skill") == "researcher"]
+        assert len(researchers) == 1
+        await ex._handle_node_failure(
+            b1, "browser", "All browser layers failed again.", ex.states[b1]
+        )
+        assert len([n for n, nd in ex.graph.dg.nodes(data=True) if nd.get("skill") == "researcher"]) == 1
+
+    asyncio.run(_run())
+
+
+def test_planner_failure_surfaces_without_recovery(tmp_path, monkeypatch):
+    async def _run() -> None:
+        ex, store = _executor_with_store(tmp_path, monkeypatch)
+        nid = ex.graph.add_node_from_spec(NodeSpec(skill="planner", metadata={"label": "p"}))
+        store.save_graph(ex.graph.dg)
+        st = NodeState(node_id=nid, skill="planner", status=NodeStatus.running)
+        ex.states[nid] = st
+        before = ex.graph.dg.number_of_nodes()
+        await ex._handle_node_failure(nid, "planner", "distiller produced wrong fields", st)
+        assert ex.graph.dg.number_of_nodes() == before
+        assert ex._fatal_error is not None
+
+    asyncio.run(_run())
+
+
+# --- persistence layout --------------------------------------------------------------
+
+def test_node_filename_mapping():
+    assert node_filename("n:1") == "n_001.json"
+    assert node_filename("n:7") == "n_007.json"
+    assert node_id_from_filename("n_003.json") == "n:3"
+
+
+def test_session_query_txt_and_agent_result_revival(tmp_path, monkeypatch):
+    from computer_use_agent import persistence as pers_mod
+
+    monkeypatch.setattr(pers_mod, "SESSIONS_DIR", tmp_path / "sessions")
+    store = SessionStore("populations_dag")
+    store.save_query("Find populations of London, Paris, Berlin")
+    g = nx.DiGraph()
+    g.add_node("n:1", skill="planner", label="planner", result=AgentResult(status="complete", output='{"nodes":[]}'))
+    store.save_graph(g)
+    loaded = store.load_graph()
+    result = loaded.nodes["n:1"]["result"]
+    assert isinstance(result, AgentResult)
+    assert result.status == "complete"
+    assert store.load_query().startswith("Find populations")
+
+
+def test_legacy_pickle_fallback(tmp_path, monkeypatch, capsys):
+    from computer_use_agent import persistence as pers_mod
+
+    monkeypatch.setattr(pers_mod, "SESSIONS_DIR", tmp_path / "sessions")
+    store = SessionStore("legacy")
+    store.ensure_dirs()
+    g = nx.DiGraph()
+    g.add_node("n:1", skill="planner")
+    with (store.root / "graph.pkl").open("wb") as fh:
+        pickle.dump(g, fh)
+    loaded = store.load_graph()
+    assert "n:1" in loaded
+    assert "legacy pickle" in capsys.readouterr().err.lower()
+
+
+def test_resume_resets_running_to_pending(tmp_path, monkeypatch):
+    from computer_use_agent import persistence as pers_mod
+
+    monkeypatch.setattr(pers_mod, "SESSIONS_DIR", tmp_path / "sessions")
+    store = SessionStore("dag-test")
+    store.save_query("q")
+    g = nx.DiGraph()
+    g.add_node("n:2", skill="researcher", label="london")
+    store.save_graph(g)
+    running = NodeState(node_id="n:2", skill="researcher", status=NodeStatus.running)
+    store.save_node_state(running)
+    store.reset_running_to_pending()
+    st = store.load_node_state("n:2")
+    assert st.status == NodeStatus.pending
+
+
+def test_agent_result_revival_failure_raises(tmp_path, monkeypatch):
+    from computer_use_agent import persistence as pers_mod
+
+    monkeypatch.setattr(pers_mod, "SESSIONS_DIR", tmp_path / "sessions")
+    store = SessionStore("bad")
+    store.ensure_dirs()
+    bad = {
+        "directed": True,
+        "multigraph": False,
+        "graph": {},
+        "nodes": [{"id": "n:1", "result": {"_result_typed": True, "status": 123}}],
+        "links": [],
+    }
+    store.graph_path.write_text(json.dumps(bad), encoding="utf-8")
+    with pytest.raises(SessionLoadError):
+        store.load_graph()

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(python3 *)",
+      "Bash(python3 *)",
+      "Bash(Bash(pip install cairosvg *))",
+      "Bash(python3 *)",
+      "Bash(Bash(/usr/bin/python3 *))",
+      "Bash(../.venv/bin/python *)",
+      "Bash(sed *)",
+      "Bash(grep *)"
+    ]
+  },
+  "additionalDirectories": [
+    "/tmp"
+  ]
+}

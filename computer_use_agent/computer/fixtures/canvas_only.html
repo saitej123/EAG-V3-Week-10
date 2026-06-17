@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>canvas_only</title>
+  <style>
+    body { margin: 0; background: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { border: 1px solid #999; background: #fff; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="640" height="480"></canvas>
+  <script>
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, 640, 480);
+    ctx.beginPath();
+    ctx.arc(330, 300, 80, 0, Math.PI * 2);
+    ctx.fillStyle = 'red';
+    ctx.fill();
+    ctx.fillStyle = 'navy';
+    ctx.fillRect(200, 120, 120, 60);
+    ctx.beginPath();
+    ctx.moveTo(450, 400);
+    ctx.lineTo(500, 320);
+    ctx.lineTo(550, 400);
+    ctx.closePath();
+    ctx.fillStyle = 'green';
+    ctx.fill();
+  </script>
+</body>
+</html>

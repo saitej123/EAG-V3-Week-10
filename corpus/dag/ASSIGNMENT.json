@@ -1,0 +1,299 @@
+{
+  "description": "Browser comparison agent plus computer-use catalogue. Browser tasks show why web_search/fetch_url fail on JavaScript-rendered pages, click-revealed widgets, multi-page flows, and post-filter data. Computer-use tasks exercise the cua-driver five-layer desktop cascade and return trajectory_dir evidence from start_recording.",
+  "session_root": "state/sessions",
+  "log_dir": "logs/dag",
+  "worked_query_ids": ["COMP"],
+  "course_examples": [
+    "Compare 3 laptops under ₹80,000",
+    "Compare 5 AI coding tools by free plan and paid plan",
+    "Compare top 3 Hugging Face text-generation models sorted by likes",
+    "Compare 5 CNC/VMC training institutes in Bangalore"
+  ],
+  "submission_outline": [
+    {
+      "part": 1,
+      "title": "Anchor mission",
+      "summary": "Primary comparison benchmark — filter, sort, open cards, distil a comparison table, export the 8-section replay.",
+      "design_id": "browser_design",
+      "query_ids": ["COMP"]
+    },
+    {
+      "part": 1,
+      "title": "Marketplace maze",
+      "summary": "Search forms, price sliders, and sort toggles on live commerce and ticketing sites.",
+      "query_ids": ["DEAL", "TICKET"]
+    },
+    {
+      "part": 1,
+      "title": "Cross-site dossiers",
+      "summary": "Course-style comparisons — AI pricing (STACK) and training listings (FORGE).",
+      "query_ids": ["STACK", "FORGE"]
+    },
+    {
+      "part": 1,
+      "title": "Cascade laboratory",
+      "summary": "Same browser skill, cheapest correct path wins: extract → deterministic → a11y → vision → blocked.",
+      "query_ids": ["B1", "B2", "B3", "B4"]
+    },
+    {
+      "part": 9,
+      "title": "Computer-use catalogue",
+      "summary": "Three primary-OS desktop tasks recorded with cua-driver start_recording: deterministic Calculator, Cursor Electron page control, and canvas-only vision.",
+      "design_id": "computer_design",
+      "query_ids": ["CU-CALC", "CU-CURSOR", "CU-CANVAS"]
+    }
+  ],
+  "design_queries": [
+    {
+      "id": "browser_design",
+      "kind": "browser",
+      "title": "Browser comparison agent + replay viewer",
+      "query_id": "COMP",
+      "requirements": [
+        "web_search/fetch_url fail on JS-rendered pages, click-revealed widgets, multi-page flows, and post-filter/sort data — use browser.",
+        "Pick one comparison task: 3 laptops under ₹80,000 (DEAL), 5 AI coding tools free vs paid (STACK), top 3 HF models by likes (COMP), or 5 CNC/VMC institutes Bangalore (FORGE).",
+        "At least three visible browser actions — search, filter, sort, open detail pages, tabs, expand hidden content, or submit a form. Not passive search snippets.",
+        "Structured comparison table plus 8-section replay: goal, DAG, path (extract/deterministic/a11y/vision/blocked), actions, screenshots/logs, data, table, cost.",
+        "Orchestrator unchanged — new behaviour via skill catalogue or Browser skill extension only."
+      ],
+      "verify": "Run COMP from Tasks; Graph & Replay → Replay report. Or Open COMP replay demo.",
+      "layer_demos": ["B1", "B2", "B3", "B4"],
+      "creative_comparisons": ["DEAL", "STACK", "FORGE"]
+    },
+    {
+      "id": "computer_design",
+      "kind": "computer",
+      "title": "Computer-use skill + evidence",
+      "query_id": "CU-CALC",
+      "requirements": [
+        "Pick three real primary-OS tasks from the brief and keep them runnable from the UI catalogue.",
+        "Show the five-layer cascade discipline in code: read → hotkey → electron page → AX → vision.",
+        "At least one task must use vision, at least one must use the Electron page path, and at least one must complete with zero vision calls.",
+        "Every computer run must call start_recording and return trajectory_dir as evidence."
+      ],
+      "verify": "Run CU-CALC, CU-CURSOR, and CU-CANVAS from Tasks; each ComputerOutput includes path and trajectory_dir.",
+      "computer_tasks": ["CU-CALC", "CU-CURSOR", "CU-CANVAS"]
+    }
+  ],
+  "browser_findings": {
+    "canvas_heavy_a11y_wins": "Six real canvas-heavy targets predicted to need vision all resolved on a11y via the natural cascade.",
+    "vision_only_on_adversarial_fixture": "Vision path required only for B4 (canvas-only.html), built to defeat a11y.",
+    "architecture": "User goal → planner → researcher (optional URL discovery) → browser (extract → deterministic → a11y → vision → blocked) → distiller → critic → formatter → replay viewer. Gateway blocked → recover or report.",
+    "creative_patterns": "DEAL/COMP stress filter+sort+open flows; STACK/FORGE stress multi-row tables (pricing or training listings). TICKET is an optional bonus."
+  },
+  "browser_reference_runs": [
+    {"layer": "1", "target": "news.ycombinator.com", "path": "extract", "turns": 0, "cost_usd": 0.0, "wall_clock_sec": 2.1, "query_id": "B1"},
+    {"layer": "2a", "target": "amazon.com product page", "path": "deterministic", "turns": 0, "cost_usd": 0.0, "wall_clock_sec": 4.3, "query_id": "B2"},
+    {"layer": "2b", "target": "huggingface.co/models", "path": "a11y", "turns": 5, "cost_usd": 0.0, "wall_clock_sec": 5.6, "input_tokens": 9620, "output_tokens": 408, "query_id": "B3"},
+    {"layer": "3", "target": "local canvas-only.html", "path": "vision", "turns": 7, "cost_usd": 0.0, "wall_clock_sec": 29.7, "input_tokens": 4867, "output_tokens": 620, "query_id": "B4"}
+  ],
+  "computer_findings": {
+    "architecture": "ComputerSkill records first, then cascades read → hotkey → electron page → AX → vision; the first verified layer stops the run and stores trajectory_dir.",
+    "zero_vision_task": "CU-CALC pins Layer 2a hotkey and verifies Calculator output without calling vision.",
+    "electron_task": "CU-CURSOR uses electron_debugging_port=9222 and the cua page tool against Cursor/VS Code.",
+    "vision_task": "CU-CANVAS opens computer/fixtures/canvas_only.html and forces Layer 3 vision because the useful target has no accessible semantics.",
+    "known_failure_modes": "Cursor must be launched with remote debugging; Calculator window discovery can fail if the OS app name differs; canvas vision depends on a browser window opening the local fixture."
+  },
+  "computer_reference_runs": [
+    {"layer": "2a", "target": "Windows Calculator", "path": "hotkey", "turns": 0, "vision_calls": 0, "query_id": "CU-CALC", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"},
+    {"layer": "2b", "target": "Cursor", "path": "electron", "turns": "1-8", "vision_calls": 0, "query_id": "CU-CURSOR", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"},
+    {"layer": "3", "target": "canvas_only.html", "path": "vision", "turns": "1-8", "vision_calls": ">=1", "query_id": "CU-CANVAS", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"}
+  ],
+  "queries": [
+    {
+      "id": "COMP",
+      "part": 1,
+      "label": "COMP",
+      "title": "Hugging Face likes leaderboard",
+      "featured": "browser_design",
+      "query": "Compare the top 3 Hugging Face text-generation models sorted by likes: go to https://huggingface.co/models, filter text-generation and transformers, sort by most likes, open the top three model cards, return a table (model, likes, one-line description). At least three browser actions (filter, sort, open cards). Do not use search snippets only.",
+      "wall_clock_sec": 180,
+      "expected_nodes_min": 4,
+      "expected_skills": ["planner", "browser", "distiller", "formatter"],
+      "expected_auto": ["critic"],
+      "expected_flow": "planner → browser → distiller → critic → formatter",
+      "min_browser_actions": 3,
+      "course_example": true,
+      "ui_hint": "Primary demo — dropdown filters + sort + model cards.",
+      "verify_hint": "Path likely a11y; replay shows ≥3 actions + comparison table."
+    },
+    {
+      "id": "DEAL",
+      "part": 1,
+      "label": "DEAL",
+      "title": "Midnight laptop hunt — Flipkart",
+      "featured": "browser_creative",
+      "query": "Compare 3 laptops under ₹80,000 on Flipkart: go to https://www.flipkart.com, search laptop, filter price up to ₹80,000, sort by rating, open three product pages, return a table (name, price, CPU/RAM, rating). At least three browser actions (search, filter or sort, open pages). Do not use search snippets only.",
+      "wall_clock_sec": 180,
+      "expected_nodes_min": 4,
+      "expected_skills": ["planner", "browser", "distiller", "formatter"],
+      "expected_auto": ["critic"],
+      "expected_flow": "planner → browser → distiller → critic → formatter",
+      "min_browser_actions": 3,
+      "course_example": true,
+      "ui_hint": "E-commerce maze — search box, price facet, product cards.",
+      "verify_hint": "Table with price + spec; replay logs filter/sort clicks."
+    },
+    {
+      "id": "TICKET",
+      "part": 1,
+      "label": "TICKET",
+      "title": "Trending repos — GitHub",
+      "featured": "browser_creative",
+      "query": "Compare 3 trending open-source repositories on GitHub: go to https://github.com/trending, optionally pick a language from the sidebar, open three repository pages from the trending list, and return a comparison table with columns: repository name, star count, primary language. Use the browser skill with at least three visible actions (scroll or filter, open repo pages). Do not use search snippets only.",
+      "wall_clock_sec": 120,
+      "expected_nodes_min": 4,
+      "expected_skills": ["planner", "browser", "distiller", "formatter"],
+      "expected_auto": ["critic"],
+      "expected_flow": "planner → browser → distiller → critic → formatter",
+      "min_browser_actions": 3,
+      "ui_hint": "Simple list UI — trending feed, language filter, repo detail pages.",
+      "verify_hint": "Three repos with stars and language; replay logs open-repo clicks."
+    },
+    {
+      "id": "STACK",
+      "part": 1,
+      "label": "STACK",
+      "title": "5 AI coding tools — free vs paid",
+      "featured": "browser_creative",
+      "query": "Compare 5 AI coding tools by free plan and paid plan: visit official pricing for Cursor, GitHub Copilot, Codeium (Windsurf), Tabnine, and Continue.dev. Return a table (tool, free tier summary, paid starting price). At least three browser actions across the sites. Use only text from each vendor's official pricing page — put — if not listed. Do not invent model names or prices.",
+      "wall_clock_sec": 150,
+      "expected_nodes_min": 4,
+      "expected_skills": ["planner", "browser", "distiller", "formatter"],
+      "expected_auto": ["critic"],
+      "expected_flow": "planner → browser → distiller → critic → formatter",
+      "min_browser_actions": 3,
+      "course_example": true,
+      "ui_hint": "Five pricing pages — browser opens up to five URLs; formatter fills any gaps from live official pages.",
+      "verify_hint": "Five tools with free vs paid columns; replay logs ≥3 actions."
+    },
+    {
+      "id": "FORGE",
+      "part": 1,
+      "label": "FORGE",
+      "title": "CNC/VMC training — Bangalore",
+      "featured": "browser_creative",
+      "query": "Compare 5 CNC/VMC training institutes in Bangalore: go to https://www.urbanpro.com/bangalore/cnc-programming-training, use search or filters, open five institute listings, return a table (institute, course duration, approximate fee). At least three browser actions (search, filter, or open listings). Do not use google.com.",
+      "wall_clock_sec": 120,
+      "expected_nodes_min": 4,
+      "expected_skills": ["planner", "browser", "distiller", "formatter"],
+      "expected_auto": ["critic"],
+      "expected_flow": "planner → browser → distiller → critic → formatter",
+      "min_browser_actions": 3,
+      "course_example": true,
+      "ui_hint": "UrbanPro listings — search/filter then open institute detail pages.",
+      "verify_hint": "Five institutes with duration + fee columns; replay logs ≥3 actions."
+    },
+    {
+      "id": "B1",
+      "part": 1,
+      "label": "B1",
+      "title": "Ghost layer — Hacker News extract",
+      "query": "Using the browser skill, fetch https://news.ycombinator.com and summarize the top story listings.",
+      "wall_clock_sec": 15,
+      "expected_path": "extract",
+      "expected_skills": ["planner", "browser", "formatter"],
+      "ui_hint": "Layer 1 — httpx + trafilatura, no Playwright turns."
+    },
+    {
+      "id": "B2",
+      "part": 1,
+      "label": "B2",
+      "title": "Selector sniper — Amazon SKU",
+      "query": "Using browser, search Amazon for a laptop and extract title, price, brand, and description from the top product page.",
+      "wall_clock_sec": 60,
+      "expected_path": "deterministic",
+      "expected_skills": ["planner", "browser", "formatter"],
+      "ui_hint": "Layer 2a — CSS selectors on a product detail page."
+    },
+    {
+      "id": "B3",
+      "part": 1,
+      "label": "B3",
+      "title": "Dropdown diplomat — HF filters",
+      "query": "Go to https://huggingface.co/models, filter by text-generation, filter by transformers, sort by most likes, and read the top three model cards.",
+      "wall_clock_sec": 120,
+      "expected_path": "a11y",
+      "expected_skills": ["planner", "browser", "formatter"],
+      "ui_hint": "Layer 2b — a11y tree + LLM turns (same site family as COMP)."
+    },
+    {
+      "id": "B4",
+      "part": 1,
+      "label": "B4",
+      "title": "Red circle ritual — vision only",
+      "query": "Open http://127.0.0.1:8080/sandbox/browser/canvas-only.html via browser. Click inside the red circle. Do not guess.",
+      "wall_clock_sec": 120,
+      "expected_path": "vision",
+      "expected_skills": ["planner", "browser", "formatter"],
+      "fixture": "sandbox/browser/canvas-only.html",
+      "ui_hint": "Layer 3 — set-of-marks after a11y returns an empty tree."
+    },
+    {
+      "id": "CU-CALC",
+      "part": 9,
+      "label": "CU-CALC",
+      "title": "Calculator hotkey arithmetic",
+      "featured": "computer_use",
+      "query": "Using the computer skill on my primary OS, open Calculator and compute 847 * 293. Use Layer 2a deterministic hotkeys only, record the run with start_recording, and return the numeric result plus trajectory_dir evidence.",
+      "wall_clock_sec": 60,
+      "expected_path": "hotkey",
+      "expected_skills": ["planner", "computer", "formatter"],
+      "expected_flow": "planner → computer → formatter",
+      "expected_vision_calls": 0,
+      "computer_metadata": {
+        "app": "Calculator",
+        "goal": "Open Calculator and compute 847 * 293.",
+        "force_path": "hotkey",
+        "hotkey_script": [
+          {"tool": "launch_app", "args": {"name": "Calculator"}},
+          {"tool": "type_text", "args": {"text": "847*293="}}
+        ]
+      },
+      "ui_hint": "Layer 2a — deterministic OS hotkey/button path, no LLM and zero vision calls.",
+      "verify_hint": "ComputerOutput.path=hotkey, result=248171, trajectory_dir populated."
+    },
+    {
+      "id": "CU-CURSOR",
+      "part": 9,
+      "label": "CU-CURSOR",
+      "title": "Cursor Electron proof note",
+      "featured": "computer_use",
+      "query": "Using the computer skill on my primary OS, in Cursor create or update notes/computer_use_evidence.txt with the text 'computer-use layer2b ok'. Use the Electron page path with electron_debugging_port=9222, record the run with start_recording, and return trajectory_dir evidence.",
+      "wall_clock_sec": 120,
+      "expected_path": "electron",
+      "expected_skills": ["planner", "computer", "formatter"],
+      "expected_flow": "planner → computer → formatter",
+      "expected_vision_calls": 0,
+      "computer_metadata": {
+        "app": "Cursor",
+        "goal": "In Cursor create or update notes/computer_use_evidence.txt with the text 'computer-use layer2b ok'.",
+        "force_path": "electron",
+        "electron_debugging_port": 9222
+      },
+      "ui_hint": "Layer 2b — Cursor/VS Code via cua page tool and CDP text, no vision.",
+      "verify_hint": "Launch Cursor with computer/scripts/launch_cursor_debug.ps1 first; path=electron and trajectory_dir populated."
+    },
+    {
+      "id": "CU-CANVAS",
+      "part": 9,
+      "label": "CU-CANVAS",
+      "title": "Canvas-only red circle",
+      "featured": "computer_use",
+      "query": "Using the computer skill on my primary OS, open the canvas fixture and click inside the red circle. Force Layer 3 vision because the target has no useful ARIA/AX tree, record the run with start_recording, and return trajectory_dir evidence.",
+      "wall_clock_sec": 120,
+      "expected_path": "vision",
+      "expected_skills": ["planner", "computer", "formatter"],
+      "expected_flow": "planner → computer → formatter",
+      "expected_vision_calls": 1,
+      "computer_metadata": {
+        "app": "browser",
+        "goal": "Open the canvas fixture and click inside the red circle.",
+        "force_path": "vision"
+      },
+      "fixture": "computer/fixtures/canvas_only.html",
+      "ui_hint": "Layer 3 — canvas-rendered target with no semantic controls, vision must choose pixel coordinates.",
+      "verify_hint": "ComputerOutput.path=vision and trajectory_dir contains vision_turn_*.png artifacts."
+    }
+  ]
+}
