@@ -47,7 +47,7 @@ class LLMAdapter:
 
     async def vision(self, image_data_url, prompt, schema=None, schema_name=None, max_tokens=1000, provider=None, system=None):
         import asyncio
-        from vision_api import vision_analyze, decode_image_payload
+        from ..vision_api import vision_analyze, decode_image_payload
         try:
             image_bytes = decode_image_payload(image_base64=image_data_url)
             full_prompt = prompt

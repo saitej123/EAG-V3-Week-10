@@ -38,9 +38,9 @@
     {
       "part": 9,
       "title": "Computer-use catalogue",
-      "summary": "Three primary-OS desktop tasks recorded with cua-driver start_recording: deterministic Calculator, Cursor Electron page control, and canvas-only vision.",
+      "summary": "Six primary-OS desktop task categories recorded with cua-driver start_recording: deterministic Calculator, AX notes/message drafting, Cursor Electron page control, canvas-only vision, and a multi-app workflow.",
       "design_id": "computer_design",
-      "query_ids": ["CU-CALC", "CU-CURSOR", "CU-CANVAS"]
+      "query_ids": ["CU-CALC", "CU-AX-NOTE", "CU-CURSOR", "CU-CANVAS", "CU-MSG", "CU-MULTI"]
     }
   ],
   "design_queries": [
@@ -66,13 +66,13 @@
       "title": "Computer-use skill + evidence",
       "query_id": "CU-CALC",
       "requirements": [
-        "Pick three real primary-OS tasks from the brief and keep them runnable from the UI catalogue.",
+        "Keep all six requested primary-OS task categories runnable from the UI catalogue.",
         "Show the five-layer cascade discipline in code: read → hotkey → electron page → AX → vision.",
         "At least one task must use vision, at least one must use the Electron page path, and at least one must complete with zero vision calls.",
         "Every computer run must call start_recording and return trajectory_dir as evidence."
       ],
-      "verify": "Run CU-CALC, CU-CURSOR, and CU-CANVAS from Tasks; each ComputerOutput includes path and trajectory_dir.",
-      "computer_tasks": ["CU-CALC", "CU-CURSOR", "CU-CANVAS"]
+      "verify": "Run the CU-* tasks from Tasks; each ComputerOutput includes path and trajectory_dir.",
+      "computer_tasks": ["CU-CALC", "CU-AX-NOTE", "CU-CURSOR", "CU-CANVAS", "CU-MSG", "CU-MULTI"]
     }
   ],
   "browser_findings": {
@@ -90,14 +90,20 @@
   "computer_findings": {
     "architecture": "ComputerSkill records first, then cascades read → hotkey → electron page → AX → vision; the first verified layer stops the run and stores trajectory_dir.",
     "zero_vision_task": "CU-CALC pins Layer 2a hotkey and verifies Calculator output without calling vision.",
+    "ax_notes_task": "CU-AX-NOTE pins Layer 2b AX against Notepad with cheap text judgment and zero vision.",
     "electron_task": "CU-CURSOR uses electron_debugging_port=9222 and the cua page tool against Cursor/VS Code.",
     "vision_task": "CU-CANVAS opens computer/fixtures/canvas_only.html and forces Layer 3 vision because the useful target has no accessible semantics.",
+    "message_task": "CU-MSG composes a message draft through AX and verifies the draft text from the accessibility snapshot.",
+    "multi_app_task": "CU-MULTI switches from Calculator to Notepad and records the transferred arithmetic result in the note.",
     "known_failure_modes": "Cursor must be launched with remote debugging; Calculator window discovery can fail if the OS app name differs; canvas vision depends on a browser window opening the local fixture."
   },
   "computer_reference_runs": [
     {"layer": "2a", "target": "Windows Calculator", "path": "hotkey", "turns": 0, "vision_calls": 0, "query_id": "CU-CALC", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"},
+    {"layer": "2b", "target": "Notepad", "path": "ax", "turns": "1-10", "vision_calls": 0, "query_id": "CU-AX-NOTE", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"},
     {"layer": "2b", "target": "Cursor", "path": "electron", "turns": "1-8", "vision_calls": 0, "query_id": "CU-CURSOR", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"},
-    {"layer": "3", "target": "canvas_only.html", "path": "vision", "turns": "1-8", "vision_calls": ">=1", "query_id": "CU-CANVAS", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"}
+    {"layer": "3", "target": "canvas_only.html", "path": "vision", "turns": "1-8", "vision_calls": ">=1", "query_id": "CU-CANVAS", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"},
+    {"layer": "2b", "target": "Notepad", "path": "ax", "turns": "1-10", "vision_calls": 0, "query_id": "CU-MSG", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"},
+    {"layer": "2a", "target": "Calculator + Notepad", "path": "hotkey", "turns": 0, "vision_calls": 0, "query_id": "CU-MULTI", "evidence": "state/sessions/<session>/computer/<trajectory_dir>"}
   ],
   "queries": [
     {
@@ -275,6 +281,26 @@
       "verify_hint": "Launch Cursor with computer/scripts/launch_cursor_debug.ps1 first; path=electron and trajectory_dir populated."
     },
     {
+      "id": "CU-AX-NOTE",
+      "part": 9,
+      "label": "CU-AX-NOTE",
+      "title": "Notepad AX status note",
+      "featured": "computer_use",
+      "query": "Using the computer skill on my primary OS, open Notepad and create a short status note that says 'AX layer verified for notes'. Use the AX tree with cheap text judgment only, record the run with start_recording, and return trajectory_dir evidence.",
+      "wall_clock_sec": 90,
+      "expected_path": "ax",
+      "expected_skills": ["planner", "computer", "formatter"],
+      "expected_flow": "planner → computer → formatter",
+      "expected_vision_calls": 0,
+      "computer_metadata": {
+        "app": "Notepad",
+        "goal": "Open Notepad and create a short status note that says 'AX layer verified for notes'.",
+        "force_path": "ax"
+      },
+      "ui_hint": "Layer 2b — AX tree plus cheap text judgment in a notes app, zero vision calls.",
+      "verify_hint": "ComputerOutput.path=ax and final AX snapshot contains 'AX layer verified for notes'."
+    },
+    {
       "id": "CU-CANVAS",
       "part": 9,
       "label": "CU-CANVAS",
@@ -294,6 +320,52 @@
       "fixture": "computer/fixtures/canvas_only.html",
       "ui_hint": "Layer 3 — canvas-rendered target with no semantic controls, vision must choose pixel coordinates.",
       "verify_hint": "ComputerOutput.path=vision and trajectory_dir contains vision_turn_*.png artifacts."
+    },
+    {
+      "id": "CU-MSG",
+      "part": 9,
+      "label": "CU-MSG",
+      "title": "Message draft via AX",
+      "featured": "computer_use",
+      "query": "Using the computer skill on my primary OS, open Notepad and draft this message: 'Hi team, the desktop automation evidence is recorded and ready for review.' Use Layer 2b AX with strong text verification, record the run with start_recording, and return trajectory_dir evidence.",
+      "wall_clock_sec": 90,
+      "expected_path": "ax",
+      "expected_skills": ["planner", "computer", "formatter"],
+      "expected_flow": "planner → computer → formatter",
+      "expected_vision_calls": 0,
+      "computer_metadata": {
+        "app": "Notepad",
+        "goal": "Open Notepad and draft this message: 'Hi team, the desktop automation evidence is recorded and ready for review.' Verify the exact draft text from the AX snapshot.",
+        "force_path": "ax"
+      },
+      "ui_hint": "Layer 2b — message draft composition through AX element indices and text verification.",
+      "verify_hint": "ComputerOutput.path=ax and final AX snapshot contains the exact draft message."
+    },
+    {
+      "id": "CU-MULTI",
+      "part": 9,
+      "label": "CU-MULTI",
+      "title": "Calculator to Notepad handoff",
+      "featured": "computer_use",
+      "query": "Using the computer skill on my primary OS, compute 847 * 293 in Calculator, then switch to Notepad and write 'Calculator result: 248171'. Use deterministic hotkeys/scripts, record the run with start_recording, and return trajectory_dir evidence.",
+      "wall_clock_sec": 90,
+      "expected_path": "hotkey",
+      "expected_skills": ["planner", "computer", "formatter"],
+      "expected_flow": "planner → computer → formatter",
+      "expected_vision_calls": 0,
+      "computer_metadata": {
+        "app": "Calculator",
+        "goal": "Compute 847 * 293 in Calculator, then switch to Notepad and write 'Calculator result: 248171'.",
+        "force_path": "hotkey",
+        "hotkey_script": [
+          {"tool": "launch_app", "args": {"name": "Calculator"}},
+          {"tool": "type_text", "args": {"text": "847*293="}},
+          {"tool": "launch_app", "args": {"name": "Notepad"}},
+          {"tool": "type_text", "args": {"text": "Calculator result: 248171"}}
+        ]
+      },
+      "ui_hint": "Multi-app workflow — switches from Calculator to Notepad and records the result transfer.",
+      "verify_hint": "ComputerOutput.path=hotkey; action log shows Calculator then Notepad with trajectory_dir populated."
     }
   ]
 }

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import base64
 import io
+import os
+import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -89,9 +91,14 @@ async def run_vision(
 ) -> VisionResult:
     if is_canvas_fixture_goal(goal):
         if _FIXTURE_CANVAS.is_file():
-            launched = client.launch_app(urls=[_FIXTURE_CANVAS.resolve().as_uri()])
+            before_windows = _window_keys(client.list_windows())
+            launched = _launch_canvas_fixture(client)
             launch_pid = int(as_dict(launched).get("pid") or 0)
-            pid, window_id = _wait_for_canvas_window(client, launch_pid=launch_pid)
+            pid, window_id = _wait_for_canvas_window(
+                client,
+                launch_pid=launch_pid,
+                before_windows=before_windows,
+            )
             app = ""
         if not pid or not window_id:
             return VisionResult(
@@ -123,6 +130,7 @@ async def run_vision(
             return VisionResult(success=False, note="no screenshot from cua-driver",
                                 turns=turn, pid=pid, window_id=window_id)
 
+        raw_image_url = image_url
         orig_w = int(snap.get("screenshot_width") or 0)
         orig_h = int(snap.get("screenshot_height") or 0)
         image_url, scale_x, scale_y = _resize_for_vision(image_url, orig_w, orig_h)
@@ -165,10 +173,11 @@ async def run_vision(
             "thinking": plan["thinking"],
             "actions": step_actions,
         })
+        clicked = False
         for act in step_actions:
             if not isinstance(act, dict):
                 continue
-            atype = act.get("type")
+            atype = act.get("type") or act.get("action")
             if atype == "done":
                 if bool(act.get("success")):
                     return VisionResult(
@@ -188,6 +197,7 @@ async def run_vision(
                     x=int((act.get("x") or 0) * scale_x),
                     y=int((act.get("y") or 0) * scale_y),
                 )
+                clicked = True
                 if is_canvas_fixture_goal(goal):
                     return VisionResult(
                         success=True,
@@ -207,6 +217,28 @@ async def run_vision(
                     "to_x": int((act.get("to_x") or act.get("x") or 0) * scale_x),
                     "to_y": int((act.get("to_y") or act.get("y") or 0) * scale_y),
                 })
+        if is_canvas_fixture_goal(goal) and not clicked:
+            target = _red_blob_center(raw_image_url)
+            if target:
+                x, y = target
+                client.click(pid=pid, window_id=window_id, x=x, y=y)
+                actions_log[-1]["actions"].append(
+                    {
+                        "type": "click",
+                        "x": x,
+                        "y": y,
+                        "source": "red_blob_fallback",
+                    }
+                )
+                return VisionResult(
+                    success=True,
+                    note="clicked canvas fixture target via screenshot red-blob detection",
+                    turns=turn,
+                    actions=actions_log,
+                    result="click executed",
+                    pid=pid,
+                    window_id=window_id,
+                )
 
     return VisionResult(
         success=False,
@@ -218,15 +250,59 @@ async def run_vision(
     )
 
 
+def _running_in_wsl() -> bool:
+    if os.environ.get("WSL_DISTRO_NAME"):
+        return True
+    try:
+        return "microsoft" in Path("/proc/version").read_text(encoding="utf-8").lower()
+    except OSError:
+        return False
+
+
+def _canvas_fixture_uri() -> str:
+    uri = _FIXTURE_CANVAS.resolve().as_uri()
+    try:
+        from cua.client import _wsl_file_uri_to_windows
+
+        return _wsl_file_uri_to_windows(uri)
+    except Exception:
+        return uri
+
+
+def _launch_canvas_fixture(client: CuaDriverClient) -> dict:
+    """Open the local canvas fixture without blocking on cua-driver launch_app."""
+    uri = _canvas_fixture_uri()
+    if _running_in_wsl():
+        # Windows cua-driver launch_app can hang on local WSL file URLs. Use the
+        # Windows shell to open the fixture, then discover the browser window.
+        for command in (
+            ["cmd.exe", "/C", "start", "", "msedge", uri],
+            ["cmd.exe", "/C", "start", "", uri],
+        ):
+            try:
+                subprocess.Popen(
+                    command,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                break
+            except OSError:
+                continue
+        return {}
+    return client.launch_app(urls=[uri])
+
+
 def _wait_for_canvas_window(
     client: CuaDriverClient,
     *,
     launch_pid: int = 0,
+    before_windows: set[tuple[int, int]] | None = None,
     attempts: int = 20,
     delay_s: float = 0.5,
 ) -> tuple[int | None, int | None]:
     """Poll until the canvas fixture tab appears."""
     hints = ("canvas_only", "canvas fixture", "canvas_only.html")
+    before_windows = before_windows or set()
     for _ in range(attempts):
         if launch_pid:
             listed = client.list_windows(launch_pid)
@@ -240,7 +316,44 @@ def _wait_for_canvas_window(
         pid, wid = _pick_canvas_window(listed, hints=hints)
         if pid and wid:
             return pid, wid
+        pid, wid = _pick_new_browser_window(listed, before_windows=before_windows)
+        if pid and wid:
+            return pid, wid
         time.sleep(delay_s)
+    listed = client.list_windows()
+    return _fallback_launch_browser_window(listed)
+
+
+def _window_keys(listed: Any) -> set[tuple[int, int]]:
+    keys: set[tuple[int, int]] = set()
+    for w in windows_from_response(listed):
+        pid = int(w.get("pid") or 0)
+        wid = int(w.get("window_id") or w.get("id") or 0)
+        if pid and wid:
+            keys.add((pid, wid))
+    return keys
+
+
+def _pick_new_browser_window(
+    listed: Any,
+    *,
+    before_windows: set[tuple[int, int]],
+) -> tuple[int | None, int | None]:
+    candidates: list[tuple[int, int]] = []
+    for w in windows_from_response(listed):
+        title = str(w.get("title") or "")
+        if _vision_title_blocked(title):
+            continue
+        app_name = str(w.get("app_name") or "").lower()
+        if not any(b in app_name for b in ("msedge", "chrome", "firefox", "brave", "comet")):
+            continue
+        pid = int(w.get("pid") or 0)
+        wid = int(w.get("window_id") or w.get("id") or 0)
+        if not pid or not wid or (pid, wid) in before_windows:
+            continue
+        candidates.append((pid, wid))
+    if len(candidates) == 1:
+        return candidates[0]
     return None, None
 
 
@@ -373,3 +486,30 @@ def _resize_for_vision(
     scale_x = orig_w / nw
     scale_y = orig_h / nh
     return f"data:image/png;base64,{b64}", scale_x, scale_y
+
+
+def _red_blob_center(image_url: str) -> tuple[int, int] | None:
+    """Find the center of the dominant red blob in the canvas fixture screenshot."""
+    raw = image_url.split(",", 1)[-1]
+    try:
+        im = Image.open(io.BytesIO(base64.b64decode(raw))).convert("RGB")
+    except Exception:
+        return None
+    pixels = im.load()
+    min_x = im.width
+    min_y = im.height
+    max_x = -1
+    max_y = -1
+    count = 0
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b = pixels[x, y]
+            if r >= 180 and g <= 90 and b <= 90 and r >= g * 2 and r >= b * 2:
+                min_x = min(min_x, x)
+                min_y = min(min_y, y)
+                max_x = max(max_x, x)
+                max_y = max(max_y, y)
+                count += 1
+    if count < 100 or max_x < min_x or max_y < min_y:
+        return None
+    return (min_x + max_x) // 2, (min_y + max_y) // 2

@@ -13,6 +13,7 @@ import subprocess
 import re
 import time
 from typing import Any
+from urllib.parse import quote, unquote, urlparse
 
 
 class CuaDriverError(RuntimeError):
@@ -127,6 +128,39 @@ def _wsl_path_to_windows(path: str) -> str:
     return f"{drive.upper()}:\\{rest}"
 
 
+def _wsl_file_uri_to_windows(uri: str) -> str:
+    """Convert WSL file:// URIs to Windows file:// URIs for Windows cua-driver.exe."""
+    if not _running_in_wsl() or not isinstance(uri, str) or not uri.startswith("file://"):
+        return uri
+    parsed = urlparse(uri)
+    path = unquote(parsed.path or "")
+    if not path.startswith("/mnt/") or len(path) < 7 or path[6] != "/":
+        return uri
+    drive = path[5].upper()
+    rest = path[7:].replace("\\", "/")
+    return "file:///" + drive + ":/" + quote(rest, safe="/:@")
+
+
+def _normalize_windows_launch_args(args: dict[str, Any]) -> dict[str, Any]:
+    """Normalize launch_app paths when WSL calls the Windows driver."""
+    changed = False
+    normalized = dict(args)
+    urls = normalized.get("urls")
+    if isinstance(urls, list):
+        next_urls = []
+        for value in urls:
+            next_value = _wsl_file_uri_to_windows(value) if isinstance(value, str) else value
+            changed = changed or next_value != value
+            next_urls.append(next_value)
+        normalized["urls"] = next_urls
+    launch_path = normalized.get("launch_path")
+    if isinstance(launch_path, str):
+        next_path = _wsl_path_to_windows(launch_path)
+        changed = changed or next_path != launch_path
+        normalized["launch_path"] = next_path
+    return normalized if changed else args
+
+
 def _find_cua_driver() -> str:
     if _running_in_wsl():
         win = _find_windows_cua_driver()
@@ -207,6 +241,8 @@ class CuaDriverClient:
         if self._windows_binary and tool == "start_recording" and isinstance(args.get("output_dir"), str):
             args = dict(args)
             args["output_dir"] = _wsl_path_to_windows(args["output_dir"])
+        elif self._windows_binary and tool == "launch_app":
+            args = _normalize_windows_launch_args(args)
         payload = json.dumps(args, ensure_ascii=True)
         proc = subprocess.run(
             [self.binary, "call", tool, payload],

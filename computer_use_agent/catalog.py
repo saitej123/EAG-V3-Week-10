@@ -68,7 +68,14 @@ def load_assignment_queries() -> list[dict[str, Any]]:
 
 _REQUIRED_QUERY_FIELDS = ("id", "part", "title", "query", "wall_clock_sec")
 _BROWSER_QUERY_IDS = frozenset({"COMP", "DEAL", "TICKET", "STACK", "FORGE", "B1", "B2", "B3", "B4"})
-_COMPUTER_QUERY_IDS = frozenset({"CU-CALC", "CU-CURSOR", "CU-CANVAS"})
+_COMPUTER_QUERY_IDS = frozenset({
+    "CU-CALC",
+    "CU-AX-NOTE",
+    "CU-CURSOR",
+    "CU-CANVAS",
+    "CU-MSG",
+    "CU-MULTI",
+})
 _EXPECTED_QUERY_IDS = _BROWSER_QUERY_IDS | _COMPUTER_QUERY_IDS
 
 

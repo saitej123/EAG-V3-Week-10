@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from cua.client import CuaDriverClient, CuaDriverError
 
@@ -58,9 +59,40 @@ def _pick_computer_goal(metadata: dict, user_query: str) -> str:
     return question or uq
 
 
+def _assignment_computer_metadata(metadata: dict, user_query: str) -> dict[str, Any]:
+    """Return pinned assignment metadata for CU-* tasks when the query matches."""
+    try:
+        from ..catalog import get_dag_query, load_assignment_queries
+    except Exception:
+        return {}
+
+    qid = str(metadata.get("query_id") or metadata.get("label") or "").strip()
+    row = get_dag_query(qid) if qid else None
+    text = user_query.lower()
+    if not row:
+        for candidate in load_assignment_queries():
+            cid = str(candidate.get("id") or "")
+            query = str(candidate.get("query") or "")
+            if not candidate.get("computer_metadata"):
+                continue
+            if cid.lower() in text or (query and query.lower().strip() == text.strip()):
+                row = candidate
+                break
+    if not row or not row.get("computer_metadata"):
+        return {}
+    meta = dict(row.get("computer_metadata") or {})
+    meta["query_id"] = row.get("id")
+    return meta
+
+
 def enrich_computer_metadata(metadata: dict, user_query: str) -> dict:
     """Fill app/goal/electron port from USER_QUERY when the Planner omits them."""
     meta = dict(metadata or {})
+    pinned = _assignment_computer_metadata(meta, user_query)
+    if pinned:
+        # Assignment CU tasks have fixed layer/path evidence requirements; do
+        # not let planner/recovery drift replace their deterministic metadata.
+        meta.update(pinned)
     goal = _pick_computer_goal(meta, user_query)
     if goal:
         meta["goal"] = goal

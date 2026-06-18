@@ -7,6 +7,8 @@ import json
 import networkx as nx
 
 from computer_use_agent.computer.replay import (
+    _build_replay_frames,
+    _pick_primary_computer_run,
     build_computer_replay_report,
     computer_replay_payload,
     format_computer_replay_sections,
@@ -105,6 +107,7 @@ def test_build_computer_replay_report(tmp_path, monkeypatch):
     assert report["computer_runs"][0]["recording_ok"] is True
     assert report["computer_runs"][0]["action_count"] == 1
     assert report["computer_runs"][0]["timeline"][0]["tool"] == "launch_app"
+    assert len(report.get("frames") or []) >= 1
     sections = format_computer_replay_sections(report)
     assert len(sections) == 8
     assert "start_recording" in sections[3]["title"].lower()
@@ -162,3 +165,32 @@ def test_computer_evidence_api(tmp_path, monkeypatch):
     replay = client.get("/api/dag/computer-replay?session_id=dag_CU-CALC_api01")
     assert replay.status_code == 200
     assert replay.json()["kind"] == "computer"
+
+
+def test_pick_primary_computer_run_prefers_richest_complete_run():
+    runs = [
+        {"node_id": "n:2", "status": "failed", "action_count": 2, "timeline": [{}, {}], "recording_ok": True},
+        {"node_id": "n:5", "status": "complete", "action_count": 9, "timeline": [{}] * 9, "recording_ok": True},
+    ]
+    picked = _pick_primary_computer_run(runs)
+    assert picked["node_id"] == "n:5"
+
+
+def test_build_replay_frames_uses_turn_screenshots(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    traj = tmp_path / "state" / "sessions" / "dag_CU-CALC_frames" / "computer" / "trajectory_frames"
+    for turn in ("turn-00001", "turn-00002"):
+        tdir = traj / turn
+        tdir.mkdir(parents=True)
+        (tdir / "screenshot.png").write_bytes(b"\x89PNG\r\n")
+    run = {
+        "trajectory_dir": str(traj.resolve()),
+        "timeline": [
+            {"turn": "turn-00001", "tool": "launch_app", "summary": "Launch", "t_ms": 100},
+            {"turn": "turn-00002", "tool": "type_text", "summary": "Type", "t_ms": 900},
+        ],
+    }
+    frames = _build_replay_frames(run)
+    assert len(frames) == 2
+    assert frames[0]["path"] == "turn-00001/screenshot.png"
+    assert frames[1]["t_ms"] == 900

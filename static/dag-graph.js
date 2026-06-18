@@ -37,6 +37,15 @@
         });
     }
 
+    function closestSvgNode(target, container) {
+        let el = target;
+        while (el && el !== container) {
+            if (el.classList && el.classList.contains('dag-svg-node')) return el;
+            el = el.parentNode;
+        }
+        return null;
+    }
+
     function DagGraphController(opts) {
         this.container = opts.container;
         this.onSelect = opts.onSelect || function () {};
@@ -146,8 +155,19 @@
         });
 
         this.container.addEventListener('click', function (e) {
-            const nodeEl = e.target.closest('.dag-svg-node');
+            const nodeEl = closestSvgNode(e.target, self.container);
             if (!nodeEl) return;
+            const id = nodeEl.getAttribute('data-dag-id');
+            if (id) {
+                self.selectNode(id);
+                self.onSelect(id, self.getNodeData(id));
+            }
+        });
+        this.container.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const nodeEl = closestSvgNode(e.target, self.container);
+            if (!nodeEl) return;
+            e.preventDefault();
             const id = nodeEl.getAttribute('data-dag-id');
             if (id) {
                 self.selectNode(id);
@@ -305,6 +325,8 @@
                 flash +
                 '" data-dag-id="' +
                 escapeXml(n.id) +
+                '" tabindex="0" role="button" aria-label="Show details for ' +
+                escapeXml(n.id) +
                 '" transform="translate(' +
                 p.x +
                 ',' +
@@ -378,10 +400,10 @@
         this._lastNodeCount = nodes.length;
         this.payload = payload;
 
-        let minX = 0;
-        let minY = 0;
-        let maxX = 400;
-        let maxY = 400;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
         nodes.forEach(function (n) {
             const p = n.position || { x: 0, y: 0 };
             minX = Math.min(minX, p.x);
@@ -389,6 +411,7 @@
             maxX = Math.max(maxX, p.x + NODE_W);
             maxY = Math.max(maxY, p.y + NODE_H);
         });
+        if (!isFinite(minX)) { minX = 0; minY = 0; maxX = NODE_W; maxY = NODE_H; }
         const vbPad = 40;
         const viewBox =
             minX -

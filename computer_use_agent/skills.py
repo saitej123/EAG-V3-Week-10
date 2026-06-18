@@ -41,6 +41,42 @@ MAX_TOOL_ROUNDS = 6
 FETCH_PAGE_CHARS_FOR_DOWNSTREAM = 20_000
 
 
+def assignment_browser_metadata(metadata: dict[str, Any], user_query: str) -> dict[str, Any]:
+    """Pin browser catalogue metadata so planner/recovery drift cannot change task intent."""
+    meta = dict(metadata or {})
+    try:
+        from .comparison_format import match_assignment_query
+        from .catalog import get_dag_query, min_browser_actions_for_text
+    except Exception:
+        return meta
+
+    qid = str(meta.get("query_id") or meta.get("label") or "").strip()
+    row = get_dag_query(qid) if qid else None
+    if not row:
+        row = match_assignment_query(user_query)
+    if not row or "browser" not in (row.get("expected_skills") or []):
+        return meta
+
+    meta["query_id"] = row.get("id")
+    expected_path = str(row.get("expected_path") or "").strip().lower()
+    if expected_path:
+        meta["force_path"] = expected_path
+    try:
+        min_actions = int(row.get("min_browser_actions") or 0)
+    except (TypeError, ValueError):
+        min_actions = 0
+    if min_actions <= 0:
+        min_actions = min_browser_actions_for_text(str(row.get("query") or user_query))
+    if min_actions:
+        meta["min_browser_actions"] = min_actions
+    fixture = str(row.get("fixture") or "").strip()
+    if fixture and not meta.get("url"):
+        # B4 is a local canvas-only target; keep it on the server URL rather than
+        # relying on a planner-generated path.
+        meta["url"] = "/".join(["", fixture.replace("\\", "/").lstrip("/")])
+    return meta
+
+
 def _parse_fetch_json_text(raw: str) -> str:
     try:
         data = json.loads(raw)
@@ -646,7 +682,7 @@ async def run_skill(
                 rendered,
             )
 
-        meta = graph_nodes[node_id].get("metadata") or {}
+        meta = assignment_browser_metadata(dict(graph_nodes[node_id].get("metadata") or {}), query)
         sub_q = str(meta.get("question") or meta.get("goal") or query)
         from .comparison_format import (
             comparison_browser_goal_suffix,
@@ -669,10 +705,13 @@ async def run_skill(
                 sub_q = f"{sub_q.rstrip('.')}. {suffix}"
         meta_url = str(meta.get("url") or "").strip()
         combined = f"{sub_q}\n{query}\n{meta_url}"
-        urls = [meta_url] if meta_url.startswith("http") else extract_http_urls(combined)
+        urls = [meta_url] if meta_url.startswith(("http://", "https://", "/")) else extract_http_urls(combined)
         from .browser.urls import resolve_browser_urls
 
-        targets = resolve_browser_urls(urls[0] if urls else "", sub_q, query)
+        primary_url = urls[0] if urls else ""
+        if primary_url.startswith("/"):
+            primary_url = "http://127.0.0.1:8080" + primary_url
+        targets = resolve_browser_urls(primary_url, sub_q, query)
         if not targets:
             return (
                 AgentResult(

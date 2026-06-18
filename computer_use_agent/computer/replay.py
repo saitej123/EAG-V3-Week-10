@@ -271,6 +271,92 @@ def _artifact_url(trajectory_dir: str, rel_path: str) -> str:
     )
 
 
+def _pick_primary_computer_run(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Prefer the richest successful computer run (recovery may leave partial earlier runs)."""
+    if not runs:
+        return {}
+
+    def _score(run: dict[str, Any]) -> tuple[int, int, int, int]:
+        status = str(run.get("status") or "")
+        complete = 1 if status == "complete" else 0
+        recording = 1 if run.get("recording_ok") else 0
+        actions = int(run.get("action_count") or 0)
+        timeline_len = len(run.get("timeline") or [])
+        return (complete, recording, actions, timeline_len)
+
+    return max(runs, key=_score)
+
+
+def _build_replay_frames(run: dict[str, Any]) -> list[dict[str, Any]]:
+    """Ordered replay frames from trajectory turns (screenshot per turn, optional click)."""
+    trajectory_dir = str(run.get("trajectory_dir") or "")
+    root = _safe_trajectory_dir(trajectory_dir)
+    if not root:
+        return []
+
+    timeline = run.get("timeline") or []
+    frames: list[dict[str, Any]] = []
+
+    def _append_frame(rel_path: str, *, section: str, caption: str, step: dict[str, Any] | None = None) -> None:
+        frames.append(
+            {
+                "url": _artifact_url(trajectory_dir, rel_path),
+                "path": rel_path,
+                "caption": caption or rel_path,
+                "section": section,
+                "t_ms": step.get("t_ms") if isinstance(step, dict) else None,
+                "turn": step.get("turn") if isinstance(step, dict) else None,
+                "tool": step.get("tool") if isinstance(step, dict) else None,
+            }
+        )
+
+    for step in timeline:
+        if not isinstance(step, dict):
+            continue
+        turn = str(step.get("turn") or "").strip()
+        if not turn:
+            continue
+        tool = str(step.get("tool") or "action")
+        summary = str(step.get("summary") or "").strip()
+        t_ms = step.get("t_ms")
+        section = f"{turn} · {tool}"
+        if isinstance(t_ms, (int, float)):
+            caption = f"@{int(t_ms)}ms — {summary}" if summary else f"@{int(t_ms)}ms"
+        else:
+            caption = summary or f"{turn}/screenshot.png"
+
+        screenshot_rel = f"{turn}/screenshot.png"
+        if (root / screenshot_rel).is_file():
+            _append_frame(screenshot_rel, section=section, caption=caption, step=step)
+
+        click_rel = f"{turn}/click.png"
+        if (root / click_rel).is_file():
+            click_caption = f"{caption} (click target)" if caption else click_rel
+            _append_frame(click_rel, section=section, caption=click_caption, step=step)
+
+    if frames:
+        return frames
+
+    for file_info in _list_trajectory_files(trajectory_dir):
+        if file_info.get("kind") != "image":
+            continue
+        rel = str(file_info.get("path") or "")
+        if not rel:
+            continue
+        frames.append(
+            {
+                "url": _artifact_url(trajectory_dir, rel),
+                "path": rel,
+                "caption": rel,
+                "section": "Trajectory",
+                "t_ms": None,
+                "turn": None,
+                "tool": None,
+            }
+        )
+    return frames
+
+
 def _manifest_summary(trajectory_dir: str) -> str:
     root = _safe_trajectory_dir(trajectory_dir)
     if not root:
@@ -325,7 +411,7 @@ def _expected_for_query(query_id: str | None) -> dict[str, Any]:
 
 def format_computer_replay_sections(report: dict[str, Any]) -> list[dict[str, Any]]:
     """Numbered evidence sections for the computer trajectory viewer."""
-    run = (report.get("computer_runs") or [{}])[0] if report.get("computer_runs") else {}
+    run = _pick_primary_computer_run(report.get("computer_runs") or [])
     dag = report.get("planner_dag") or {}
     timeline = run.get("timeline") or []
     actions = run.get("actions") or []
@@ -341,14 +427,15 @@ def format_computer_replay_sections(report: dict[str, Any]) -> list[dict[str, An
         action_lines = [_format_action_line(a, i + 1) for i, a in enumerate(actions)]
     trajectory_dir = str(run.get("trajectory_dir") or "")
     files = _list_trajectory_files(trajectory_dir) if trajectory_dir else []
+    replay_frames = report.get("frames") or _build_replay_frames(run)
     images = [
         {
-            "path": f["path"],
-            "caption": f["path"],
-            "url": _artifact_url(trajectory_dir, f["path"]),
+            "path": frame.get("path") or "",
+            "caption": frame.get("caption") or frame.get("path") or "",
+            "url": frame.get("url") or "",
         }
-        for f in files
-        if f.get("kind") == "image"
+        for frame in replay_frames
+        if frame.get("url")
     ]
 
     dag_lines = [f"{n.get('id')} ({n.get('skill')})" for n in dag.get("nodes") or []]
@@ -371,7 +458,7 @@ def format_computer_replay_sections(report: dict[str, Any]) -> list[dict[str, An
         verify_bits.append(f"expected vision calls={expected['expected_vision_calls']}")
     if expected.get("verify_hint"):
         verify_bits.append(str(expected["verify_hint"]))
-    verify_body = "\n".join(verify_bits) if verify_bits else "(see assignment catalogue)"
+    verify_body = "\n".join(verify_bits) if verify_bits else "(see task catalogue)"
 
     return [
         {"n": 1, "title": "Original user goal", "body": report.get("user_goal") or "(none)"},
@@ -408,7 +495,7 @@ def format_computer_replay_sections(report: dict[str, Any]) -> list[dict[str, An
         },
         {
             "n": 8,
-            "title": "Result & assignment verify",
+            "title": "Result & task verify",
             "body": (
                 f"result={run.get('result_preview') or sanitize_evidence_text(run.get('result')) or '(none)'}\n"
                 f"app={run.get('app') or '?'}\n"
@@ -474,17 +561,21 @@ def build_computer_replay_report(session_id: str, *, node_id: str | None = None)
         )
 
     query_id = _query_id_from_session(session_id)
+    primary_run = _pick_primary_computer_run(computer_runs)
+    primary_id = str(primary_run.get("node_id") or primary_id or "")
+
     report: dict[str, Any] = {
         "kind": "computer",
         "available": bool(computer_runs) or bool(query),
         "session_id": session_id,
         "query_id": query_id,
-        "node_id": primary_id,
+        "node_id": primary_id or None,
         "user_goal": query,
         "planner_dag": _planner_dag_summary(store),
         "computer_runs": computer_runs,
         "expected": _expected_for_query(query_id),
     }
+    report["frames"] = _build_replay_frames(primary_run) if primary_run else []
     report["sections"] = format_computer_replay_sections(report)
     report["markdown"] = replay_report_markdown(report)
     return report

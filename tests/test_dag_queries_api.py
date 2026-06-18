@@ -25,11 +25,14 @@ EXPECTED_IDS = [
     "B3",
     "B4",
     "CU-CALC",
+    "CU-AX-NOTE",
     "CU-CURSOR",
     "CU-CANVAS",
+    "CU-MSG",
+    "CU-MULTI",
 ]
 CREATIVE_IDS = ["DEAL", "TICKET", "STACK", "FORGE"]
-COMPUTER_IDS = ["CU-CALC", "CU-CURSOR", "CU-CANVAS"]
+COMPUTER_IDS = ["CU-CALC", "CU-AX-NOTE", "CU-CURSOR", "CU-CANVAS", "CU-MSG", "CU-MULTI"]
 
 
 def test_validate_assignment_corpus_clean():
@@ -89,8 +92,8 @@ def test_api_dag_queries_success():
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "success"
-    assert body["query_count"] == 12
-    assert len(body["queries"]) == 12
+    assert body["query_count"] == 15
+    assert len(body["queries"]) == 15
     assert len(body["design_queries"]) == 2
     assert len(body["groups"]) == 5
     assert len(body["outline"]) == 5
@@ -132,12 +135,59 @@ def test_computer_queries_cover_required_paths():
     assert set(COMPUTER_IDS).issubset(by_id)
     assert by_id["CU-CALC"]["expected_path"] == "hotkey"
     assert by_id["CU-CALC"]["expected_vision_calls"] == 0
+    assert by_id["CU-AX-NOTE"]["expected_path"] == "ax"
+    assert by_id["CU-AX-NOTE"]["expected_vision_calls"] == 0
     assert by_id["CU-CURSOR"]["expected_path"] == "electron"
     assert by_id["CU-CURSOR"]["computer_metadata"]["electron_debugging_port"] == 9222
     assert by_id["CU-CURSOR"]["expected_vision_calls"] == 0
     assert by_id["CU-CANVAS"]["expected_path"] == "vision"
     assert by_id["CU-CANVAS"]["expected_vision_calls"] >= 1
+    assert by_id["CU-MSG"]["expected_path"] == "ax"
+    assert by_id["CU-MSG"]["expected_vision_calls"] == 0
+    assert by_id["CU-MULTI"]["expected_path"] == "hotkey"
+    assert by_id["CU-MULTI"]["expected_vision_calls"] == 0
     assert all("computer" in by_id[qid]["expected_skills"] for qid in COMPUTER_IDS)
+
+
+def test_assignment_browser_metadata_pins_layer_lab_tasks():
+    from computer_use_agent.skills import assignment_browser_metadata
+
+    rows = {q["id"]: q for q in load_assignment_queries()}
+    expected = {
+        "B1": ("extract", 0),
+        "B2": ("deterministic", 0),
+        "B3": ("a11y", 0),
+        "B4": ("vision", 0),
+        "COMP": ("", 3),
+        "DEAL": ("", 3),
+        "TICKET": ("", 3),
+        "STACK": ("", 3),
+        "FORGE": ("", 3),
+    }
+    for qid, (path, min_actions) in expected.items():
+        meta = assignment_browser_metadata({"label": "planner drift"}, rows[qid]["query"])
+        assert meta["query_id"] == qid
+        if path:
+            assert meta["force_path"] == path
+        else:
+            assert "force_path" not in meta
+        if min_actions:
+            assert meta["min_browser_actions"] >= min_actions
+    assert assignment_browser_metadata({}, rows["B4"]["query"])["url"] == "/sandbox/browser/canvas-only.html"
+
+
+def test_assignment_computer_metadata_pins_all_cu_tasks():
+    from computer_use_agent.computer.goal_utils import enrich_computer_metadata
+
+    rows = {q["id"]: q for q in load_assignment_queries()}
+    for qid in COMPUTER_IDS:
+        meta = enrich_computer_metadata(
+            {"label": "planner drift", "force_path": "read", "hotkey_script": ["bad"]},
+            rows[qid]["query"],
+        )
+        assert meta["query_id"] == qid
+        assert meta["force_path"] == rows[qid]["expected_path"]
+        assert meta["app"] == rows[qid]["computer_metadata"]["app"]
 
 
 def test_api_dag_queries_render_fields_for_ui():
@@ -153,8 +203,11 @@ def test_api_dag_queries_render_fields_for_ui():
     assert by_id["B1"]["expected_path"] == "extract"
     assert by_id["B4"]["expected_path"] == "vision"
     assert by_id["CU-CALC"]["expected_path"] == "hotkey"
+    assert by_id["CU-AX-NOTE"]["expected_path"] == "ax"
     assert by_id["CU-CURSOR"]["expected_path"] == "electron"
     assert by_id["CU-CANVAS"]["expected_path"] == "vision"
+    assert by_id["CU-MSG"]["expected_path"] == "ax"
+    assert by_id["CU-MULTI"]["expected_path"] == "hotkey"
     assert by_id["CU-CALC"]["expected_vision_calls"] == 0
 
 
@@ -173,7 +226,7 @@ def test_api_browser_queries_success():
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "success"
-    assert body["query_count"] == 12
+    assert body["query_count"] == 15
     ids = {q["id"] for q in body["queries"]}
     assert ids == set(EXPECTED_IDS)
     assert len(body["design_queries"]) == 2

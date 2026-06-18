@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
+import time
 from typing import Any
 
 from cua.client import CuaDriverClient
@@ -37,13 +39,7 @@ async def run_ax(
         return AxResult(success=False, note="canvas fixture uses vision layer")
 
     if not pid or not window_id:
-        launched = safe_launch_app(client, app)
-        payload = as_dict(launched)
-        if payload:
-            pid = int(payload.get("pid") or 0)
-            wins = windows_from_response(payload)
-            if wins:
-                window_id = int(wins[0].get("window_id") or wins[0].get("id") or 0)
+        pid, window_id = _ensure_ax_window(client, app, pid, window_id)
     if not pid or not window_id:
         return AxResult(success=False, note="no target window for AX layer")
 
@@ -83,7 +79,7 @@ async def run_ax(
                     window_id=window_id,
                 )
             if atype == "hotkey":
-                client.hotkey(keys=act.get("keys") or [])
+                client.hotkey(keys=act.get("keys") or [], pid=pid, window_id=window_id)
             elif atype == "type_text":
                 idx = act.get("element_index")
                 if idx is not None:
@@ -111,6 +107,75 @@ async def run_ax(
         pid=pid,
         window_id=window_id,
     )
+
+
+def _ensure_ax_window(
+    client: CuaDriverClient,
+    app: str,
+    pid: int | None,
+    window_id: int | None,
+    *,
+    attempts: int = 12,
+    delay_s: float = 0.35,
+) -> tuple[int | None, int | None]:
+    """Resolve a stable AX target window before issuing element_index actions."""
+    if pid and window_id:
+        return int(pid), int(window_id)
+
+    if pid:
+        found = _window_from_list(client.list_windows(int(pid)), app=app, pid=int(pid))
+        if found[0] and found[1]:
+            return found
+
+    found = _window_from_list(client.list_windows(), app=app)
+    if found[0] and found[1]:
+        return found
+
+    launched = safe_launch_app(client, app)
+    payload = as_dict(launched)
+    launch_pid = int(payload.get("pid") or 0) or None
+    wins = windows_from_response(payload)
+    if wins:
+        win = wins[0]
+        launch_pid = int(win.get("pid") or launch_pid or 0) or launch_pid
+        launch_window_id = int(win.get("window_id") or win.get("id") or 0) or None
+        if launch_pid and launch_window_id:
+            return launch_pid, launch_window_id
+
+    for _ in range(attempts):
+        if launch_pid:
+            found = _window_from_list(client.list_windows(launch_pid), app=app, pid=launch_pid)
+            if found[0] and found[1]:
+                return found
+        found = _window_from_list(client.list_windows(), app=app)
+        if found[0] and found[1]:
+            return found
+        time.sleep(delay_s)
+
+    return launch_pid, None
+
+
+def _window_from_list(
+    listed: Any,
+    *,
+    app: str,
+    pid: int | None = None,
+) -> tuple[int | None, int | None]:
+    hints = [part for part in re.split(r"[^a-z0-9]+", str(app or "").lower()) if part]
+    for w in windows_from_response(listed):
+        resolved_pid = int(w.get("pid") or 0)
+        resolved_wid = int(w.get("window_id") or w.get("id") or 0)
+        if pid and resolved_pid != int(pid):
+            continue
+        if hints:
+            title = str(w.get("title") or "").lower()
+            app_name = str(w.get("app_name") or w.get("process_name") or "").lower()
+            haystack = f"{title} {app_name}"
+            if not any(h in haystack for h in hints):
+                continue
+        if resolved_pid and resolved_wid:
+            return resolved_pid, resolved_wid
+    return None, None
 
 
 def _legend(snap: dict) -> str:

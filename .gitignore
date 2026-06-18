@@ -14,7 +14,7 @@ sandbox/**/*.pdf
 sandbox/research_papers/
 sandbox/uploads/
 sandbox_home/
-
+.abacusai/
 # Crawl4AI cache next to mcp_server.py / agent (regenerated)
 .crawl4ai/
 /Browser_Automation/

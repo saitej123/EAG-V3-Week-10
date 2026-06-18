@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-    <script src="/static/dag-graph.js?v=2"></script>
+    <script src="/static/dag-graph.js?v=3"></script>
     <style>
         :root {
             --background: #ffffff;
@@ -134,9 +134,7 @@
         }
         #panelOverview:not(.hidden),
         #panelTasks:not(.hidden),
-        #panelEvidence:not(.hidden),
-        #panelGraph:not(.hidden),
-        #panelReplay:not(.hidden) {
+        #panelGraph:not(.hidden) {
             display: flex;
             flex-direction: column;
             flex: 1 1 auto;
@@ -144,8 +142,7 @@
             overflow: hidden;
         }
         #panelOverview:not(.hidden),
-        #panelGraph:not(.hidden),
-        #panelReplay:not(.hidden) {
+        #panelGraph:not(.hidden) {
             overflow-y: auto;
             overflow-x: hidden;
             overscroll-behavior: contain;
@@ -367,11 +364,11 @@
         .cu-layer-pill.layer-hotkey { border-color: #d4d4d8; background: #fafafa; color: #27272a; }
         .cu-layer-pill.layer-electron { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
         .cu-layer-pill.layer-vision { border-color: #fecdd3; background: #fff1f2; color: #be123c; }
-        .assignment-grid {
+        .task-progress-grid {
             display: grid;
             gap: 0.45rem;
         }
-        .assignment-item {
+        .task-progress-item {
             display: flex;
             align-items: flex-start;
             gap: 0.5rem;
@@ -380,14 +377,14 @@
             border: 1px solid var(--border);
             background: #fff;
         }
-        .assignment-item strong {
+        .task-progress-item strong {
             display: block;
             font-size: 0.6875rem;
             font-weight: 600;
             color: var(--foreground);
             line-height: 1.25;
         }
-        .assignment-item span {
+        .task-progress-item span {
             display: block;
             font-size: 0.625rem;
             line-height: 1.35;
@@ -702,8 +699,7 @@
         .sidebar-examples-scroll {
             max-height: min(52vh, 440px);
         }
-        #dagQueriesScroll,
-        #evidenceRunsScroll {
+        #dagQueriesScroll {
             flex: 1 1 auto;
             min-height: 10rem;
             overflow-y: auto;
@@ -1563,16 +1559,6 @@
         .layout-main.evidence-mode #resultPanel,
         .layout-main.evidence-mode #documentsPanel,
         .layout-main.evidence-mode #dagGraphPanel { display: none !important; }
-        .layout-main.evidence-mode #evidenceDetailPanel {
-            display: flex;
-            flex-direction: column;
-            flex: 1 1 auto;
-            min-height: 0;
-            height: 100%;
-            overflow: hidden;
-            padding: 0.75rem 1rem 1rem;
-            gap: 0.5rem;
-        }
         .evidence-detail-toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -1597,6 +1583,102 @@
             background: #fafafa;
             padding: 0.75rem;
         }
+        /* DAG workspace sub-tab bar */
+        #dagWorkspaceTabs { display: none; }
+        .layout-main.graph-mode #dagWorkspaceTabs,
+        .layout-main.replay-mode #dagWorkspaceTabs,
+        .layout-main.evidence-mode #dagWorkspaceTabs {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-shrink: 0;
+            padding: 0 0.25rem 0.5rem;
+        }
+        .dag-subtab {
+            border: 1px solid transparent;
+            background: transparent;
+            color: #71717a;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.4rem 0.85rem;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .dag-subtab:hover { background: #f4f4f5; color: #18181b; }
+        .dag-subtab.is-active {
+            background: #18181b;
+            color: #fff;
+            border-color: #18181b;
+        }
+        .dag-subtab-spacer { flex: 1 1 auto; }
+        /* Evidence list panel (Evidence sub-tab) */
+        #evidenceListPanel { display: none; }
+        .layout-main.evidence-mode #evidenceListPanel {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+            overflow: hidden;
+            padding: 0.75rem 1rem 1rem;
+            gap: 0.5rem;
+        }
+        .layout-main.evidence-mode.evidence-detail-open #evidenceListPanel { display: none; }
+        .layout-main.evidence-mode #evidenceDetailPanel { display: none !important; }
+        .layout-main.evidence-mode.evidence-detail-open #evidenceDetailPanel {
+            display: flex !important;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+            overflow: hidden;
+            padding: 0.75rem 1rem 1rem;
+            gap: 0.5rem;
+        }
+        .evidence-list-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem 0.75rem;
+            flex-shrink: 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .evidence-list-toolbar-title {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #18181b;
+            margin-right: auto;
+        }
+        .evidence-list-body {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            padding: 0.25rem 0.25rem 0.5rem;
+        }
+        .evidence-constraint-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+        .evidence-constraint-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.625rem;
+            font-weight: 600;
+            border: 1px solid #e4e4e7;
+            background: #fff;
+            color: #52525b;
+        }
+        .evidence-constraint-badge.met { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+        .evidence-constraint-badge.unmet { border-color: #fde68a; background: #fffbeb; color: #b45309; }
         .evidence-detail-header {
             display: flex;
             flex-wrap: wrap;
@@ -2014,9 +2096,9 @@
             cursor: pointer;
         }
         .browser-replay-toolbar button:hover { background: #e4e4e7; }
-        .replay-frame-viewer {
+        .replay-player {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(10rem, 13rem);
+            grid-template-columns: minmax(0, 1fr) minmax(11rem, 14rem);
             gap: 0.75rem;
             align-items: stretch;
             margin-bottom: 0.75rem;
@@ -2025,69 +2107,157 @@
             border-radius: 0.75rem;
             background: #fff;
         }
-        .replay-frame-stage {
+        .replay-screen {
+            display: flex;
             min-width: 0;
+            flex-direction: column;
+        }
+        .replay-stage {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
             border: 1px solid #e4e4e7;
             border-radius: 0.6rem;
             overflow: hidden;
-            background: #f4f4f5;
+            background: #18181b;
         }
-        .replay-frame-stage img {
+        .replay-stage img {
             display: block;
             width: 100%;
-            max-height: 58vh;
+            max-height: 56vh;
             object-fit: contain;
-            background: #f4f4f5;
+            background: #18181b;
         }
-        .replay-frame-caption {
-            padding: 0.45rem 0.55rem;
-            font-size: 0.68rem;
-            line-height: 1.35;
-            color: #3f3f46;
+        .replay-stage-badge {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            background: rgba(24, 24, 27, 0.82);
+            color: #fff;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+        .replay-scrubber {
+            margin-top: 0.55rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        .replay-track {
+            position: relative;
+            height: 0.5rem;
+            border-radius: 999px;
+            background: #e4e4e7;
+            cursor: pointer;
+        }
+        .replay-track-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            border-radius: 999px;
+            background: #18181b;
+            width: 0;
+        }
+        .replay-track-chapter {
+            position: absolute;
+            top: -3px;
+            width: 2px;
+            height: calc(100% + 6px);
+            background: #f59e0b;
+            transform: translateX(-1px);
+        }
+        .replay-controls {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+        .replay-controls button {
+            border: 1px solid #d4d4d8;
+            background: #fafafa;
+            color: #18181b;
+            border-radius: 0.45rem;
+            cursor: pointer;
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.3rem 0.55rem;
+        }
+        .replay-controls button:hover { background: #f4f4f5; }
+        .replay-controls button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        .replay-controls .replay-play {
+            background: #18181b;
+            color: #fff;
+            border-color: #18181b;
+            min-width: 4.25rem;
+        }
+        .replay-counter {
+            font-size: 0.65rem;
+            color: #52525b;
+            font-variant-numeric: tabular-nums;
+        }
+        .replay-speed {
+            border: 1px solid #d4d4d8;
+            border-radius: 0.45rem;
             background: #fff;
-            border-top: 1px solid #e4e4e7;
+            font-size: 0.62rem;
+            padding: 0.25rem 0.3rem;
+            color: #3f3f46;
         }
-        .replay-frame-nav {
+        .replay-chapters {
             display: flex;
             min-height: 0;
             flex-direction: column;
-            gap: 0.45rem;
+            gap: 0.3rem;
         }
-        .replay-frame-nav-head {
+        .replay-chapters-title {
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #71717a;
+            margin-bottom: 0.1rem;
+        }
+        .replay-chapter-list {
             display: flex;
-            gap: 0.35rem;
+            min-height: 0;
+            max-height: 52vh;
+            flex-direction: column;
+            gap: 0.25rem;
+            overflow-y: auto;
         }
-        .replay-frame-nav-head button,
-        .replay-frame-list button {
-            border: 1px solid #d4d4d8;
+        .replay-chapter-list button {
+            border: 1px solid #e4e4e7;
             background: #fafafa;
             color: #3f3f46;
             border-radius: 0.45rem;
             cursor: pointer;
-            font-size: 0.65rem;
-        }
-        .replay-frame-nav-head button {
-            flex: 1;
-            padding: 0.35rem 0.45rem;
-            font-weight: 700;
-        }
-        .replay-frame-list {
-            display: flex;
-            min-height: 0;
-            max-height: 58vh;
-            flex-direction: column;
-            gap: 0.3rem;
-            overflow-y: auto;
-        }
-        .replay-frame-list button {
+            font-size: 0.64rem;
+            line-height: 1.25;
             padding: 0.35rem 0.45rem;
             text-align: left;
-            line-height: 1.25;
         }
-        .replay-frame-list button.active {
+        .replay-chapter-list button:hover { background: #f4f4f5; }
+        .replay-chapter-list button.active {
             border-color: #18181b;
             background: #18181b;
             color: #fff;
+        }
+        .replay-chapter-list button .chapter-stage {
+            display: block;
+            font-size: 0.55rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            opacity: 0.7;
         }
         .browser-replay-shots {
             display: grid;
@@ -2192,9 +2362,10 @@
                 max-height: 38vh;
             }
             #dagGraphNetwork { min-height: 45vh; }
-            .replay-frame-viewer {
+            .replay-player {
                 grid-template-columns: 1fr;
             }
+            .replay-chapter-list { max-height: 30vh; }
         }
         .rag-kind-badge { font-size: 0.5625rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.1rem 0.4rem; border-radius: 999px; }
         .rag-kind-semantic { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
@@ -2274,7 +2445,7 @@
                         <p class="brand-subtitle">Five-layer cascade</p>
                     </div>
                 </div>
-                <p class="mt-3 text-xs leading-relaxed text-zinc-500">Three primary-OS tasks from the assignment brief — each run records a trajectory directory as evidence.</p>
+                <p class="mt-3 text-xs leading-relaxed text-zinc-500">Six primary-OS task categories — each run records a trajectory directory as evidence.</p>
             </div>
 
             <div id="sidebarTablist" class="flex flex-col divide-y divide-zinc-200 border-b border-zinc-200" role="tablist" aria-label="Sidebar sections">
@@ -2285,19 +2456,11 @@
                 <button type="button" id="sidebarTabTasksBtn" role="tab" aria-selected="false" aria-controls="panelTasks" class="sidebar-tab-btn tab-trigger flex flex-wrap items-center gap-x-2 gap-y-1 border-l-transparent px-3 py-3 text-xs font-semibold leading-snug text-slate-500 transition hover:bg-slate-50/80 hover:text-slate-700 sm:text-[13px]">
                     <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13"/><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h13"/><path stroke-linecap="round" stroke-linejoin="round" d="M8 18h13"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h.01"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h.01"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 18h.01"/></svg>
                     <span>Tasks</span>
-                    <span id="browserTaskCount" class="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium leading-none text-zinc-600 tabular-nums">3</span>
-                </button>
-                <button type="button" id="sidebarTabEvidenceBtn" role="tab" aria-selected="false" aria-controls="panelEvidence" class="sidebar-tab-btn tab-trigger flex flex-wrap items-center gap-x-2 gap-y-1 border-l-transparent px-3 py-3 text-xs font-semibold leading-snug text-slate-500 transition hover:bg-slate-50/80 hover:text-slate-700 sm:text-[13px]">
-                    <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18"/><circle cx="12" cy="12" r="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v3"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h3"/><path stroke-linecap="round" stroke-linejoin="round" d="M18 12h3"/></svg>
-                    <span>Evidence</span>
+                    <span id="browserTaskCount" class="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium leading-none text-zinc-600 tabular-nums">6</span>
                 </button>
                 <button type="button" id="sidebarTabGraphBtn" role="tab" aria-selected="false" aria-controls="panelGraph" class="sidebar-tab-btn tab-trigger flex flex-wrap items-center gap-x-2 gap-y-1 border-l-transparent px-3 py-3 text-xs font-semibold leading-snug text-slate-500 transition hover:bg-slate-50/80 hover:text-slate-700 sm:text-[13px]">
                     <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 3v12"/><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v12"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 15h12"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/></svg>
                     <span>DAG</span>
-                </button>
-                <button type="button" id="sidebarTabReplayBtn" role="tab" aria-selected="false" aria-controls="panelReplay" class="sidebar-tab-btn tab-trigger flex flex-wrap items-center gap-x-2 gap-y-1 border-l-transparent px-3 py-3 text-xs font-semibold leading-snug text-slate-500 transition hover:bg-slate-50/80 hover:text-slate-700 sm:text-[13px]">
-                    <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5v14"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 5v14"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/></svg>
-                    <span>Replay</span>
                 </button>
             </div>
 
@@ -2320,21 +2483,33 @@
                         <div class="pipeline-step"><span>3</span>Vision</div>
                     </div>
                 </div>
-                <p class="mt-2 text-[10px] leading-snug text-zinc-500">Cheapest correct layer wins. Run tasks from <strong>Tasks</strong>; submit evidence from the <strong>Evidence</strong> tab.</p>
+                <p class="mt-2 text-[10px] leading-snug text-zinc-500">Cheapest correct layer wins. Run tasks from <strong>Tasks</strong>; inspect the graph, evidence, and replay in the <strong>DAG</strong> tab.</p>
                 <div class="rounded-xl border border-zinc-200 bg-white p-3">
-                    <h3 class="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Assignment catalog</h3>
-                    <div class="assignment-grid mt-2">
-                        <div class="assignment-item">
+                    <h3 class="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Task catalog</h3>
+                    <div class="task-progress-grid mt-2">
+                        <div class="task-progress-item">
                             <span class="cu-task-icon"><img src="/Images/icon-calc.svg" alt=""></span>
                             <div><strong>CU-CALC · Layer 2a hotkey</strong><span>Calculator · 847 × 293 · zero vision calls</span></div>
                         </div>
-                        <div class="assignment-item">
+                        <div class="task-progress-item">
+                            <span class="cu-task-icon"><img src="/Images/app-icon.svg" alt=""></span>
+                            <div><strong>CU-AX-NOTE · Layer 2b AX</strong><span>Notepad · AX tree + text judgment · zero vision calls</span></div>
+                        </div>
+                        <div class="task-progress-item">
                             <span class="cu-task-icon"><img src="/Images/icon-cursor-app.svg" alt=""></span>
                             <div><strong>CU-CURSOR · Layer 2b electron</strong><span>Cursor page tool · port 9222 · zero vision calls</span></div>
                         </div>
-                        <div class="assignment-item">
+                        <div class="task-progress-item">
                             <span class="cu-task-icon"><img src="/Images/icon-canvas.svg" alt=""></span>
                             <div><strong>CU-CANVAS · Layer 3 vision</strong><span>Canvas fixture · no ARIA · ≥1 vision call</span></div>
+                        </div>
+                        <div class="task-progress-item">
+                            <span class="cu-task-icon"><img src="/Images/app-icon.svg" alt=""></span>
+                            <div><strong>CU-MSG · Layer 2b AX</strong><span>Message draft · strong text verification</span></div>
+                        </div>
+                        <div class="task-progress-item">
+                            <span class="cu-task-icon"><img src="/Images/icon-calc.svg" alt=""></span>
+                            <div><strong>CU-MULTI · Multi-app</strong><span>Calculator → Notepad result handoff</span></div>
                         </div>
                     </div>
                     <div class="mt-2.5 flex flex-wrap gap-1.5">
@@ -2356,8 +2531,8 @@
             </div>
 
             <div id="panelTasks" role="tabpanel" aria-labelledby="sidebarTabTasksBtn" class="hidden p-4 flex flex-col gap-2 min-h-0">
-                <p class="text-xs leading-snug text-zinc-500 shrink-0">Run all three assignment tasks. Each card shows the winning cascade layer, expected vision calls, and verification hints from the catalogue.</p>
-                <div id="dagQueriesScroll" class="dag-queries-scroll scrollbar-thin flex flex-col gap-1 min-h-0 flex-1" tabindex="0" aria-label="Assignment task list">
+                <p class="text-xs leading-snug text-zinc-500 shrink-0">Run the task cards. Each card shows the winning cascade layer, expected vision calls, and verification hints from the catalogue.</p>
+                <div id="dagQueriesScroll" class="dag-queries-scroll scrollbar-thin flex flex-col gap-1 min-h-0 flex-1" tabindex="0" aria-label="Task list">
                     <div id="testCaseList" class="flex flex-col shrink-0">
                         <p class="text-xs text-slate-400 py-4 text-center">Loading tasks…</p>
                     </div>
@@ -2367,26 +2542,18 @@
                 </button>
             </div>
 
-            <div id="panelEvidence" role="tabpanel" aria-labelledby="sidebarTabEvidenceBtn" class="hidden p-4 flex flex-col gap-2 min-h-0">
-                <p class="text-xs leading-snug text-zinc-500 shrink-0">Progress checklist and recorded computer-use runs. Click a run for the action timeline and <strong>trajectory_dir</strong>.</p>
-                <div id="evidenceAssignmentStatus" class="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 shrink-0"></div>
-                <div id="evidenceRunsScroll" class="dag-queries-scroll scrollbar-thin flex flex-col gap-1 min-h-0 flex-1" tabindex="0" aria-label="Recorded trajectories">
-                    <div class="flex shrink-0 justify-end">
-                        <button type="button" id="evidenceRefreshBtn" class="btn-shadcn btn-shadcn-outline text-[10px] py-1 px-2">Refresh</button>
-                    </div>
-                    <div id="evidenceRunsList" class="flex flex-col shrink-0">
-                        <p class="text-xs text-zinc-400 py-4 text-center">Loading evidence…</p>
-                    </div>
-                </div>
-            </div>
-
             <div id="panelGraph" role="tabpanel" aria-labelledby="sidebarTabGraphBtn" class="hidden sidebar-panel-scroll scrollbar-thin p-4 space-y-3 min-h-0" tabindex="0">
-                <p class="text-xs leading-snug text-slate-500">Inspect the live DAG. Click a node to see skill, status, and actions at that step.</p>
+                <p class="text-xs leading-snug text-slate-500">One workspace with three views: <strong>Graph</strong> (click a node for skill, status, actions), <strong>Evidence</strong> (task checklist + recorded runs and <code class="rounded bg-zinc-100 px-1 py-0.5 text-[9px]">trajectory_dir</code>), and <strong>Replay</strong> (video-style frame playback with stage chapters).</p>
+                <div class="rounded-lg border border-zinc-200 bg-zinc-50/80 p-3">
+                    <h3 class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Five-layer cascade</h3>
+                    <ul class="mt-2 space-y-1 text-[11px] leading-snug text-slate-600">
+                        <li><strong>2a hotkey</strong> — CU-CALC and CU-MULTI, zero vision calls</li>
+                        <li><strong>2b AX</strong> — CU-AX-NOTE and CU-MSG, cheap text judgment</li>
+                        <li><strong>2b electron</strong> — CU-CURSOR via port 9222</li>
+                        <li><strong>3 vision</strong> — CU-CANVAS, ≥1 vision call</li>
+                    </ul>
+                </div>
                 <p id="dagGraphSidebarMeta" class="text-[10px] text-zinc-400">Pick a session in the toolbar above the graph.</p>
-            </div>
-
-            <div id="panelReplay" role="tabpanel" aria-labelledby="sidebarTabReplayBtn" class="hidden sidebar-panel-scroll scrollbar-thin p-4 space-y-3 min-h-0" tabindex="0">
-                <p class="text-xs leading-snug text-slate-500">Browser or computer replay — jump between recorded frames, then inspect the full step log below.</p>
                 <p id="replaySidebarMeta" class="text-[10px] text-zinc-400 hidden" aria-hidden="true"></p>
             </div>
         </div>
@@ -2423,14 +2590,14 @@
                     <div class="chat-welcome-icon brand-logo brand-logo-lg" aria-hidden="true">
                         <img src="/Images/app-icon.svg" alt="">
                     </div>
-                    <p class="mt-3 text-xs leading-relaxed text-zinc-500">Pick a task from <strong>Tasks</strong> or the chips below. Evidence and trajectories are tracked in the <strong>Evidence</strong> tab.</p>
+                    <p class="mt-3 text-xs leading-relaxed text-zinc-500">Pick a task from <strong>Tasks</strong> or the chips below. The <strong>DAG</strong> tab holds the graph, evidence, and replay views for every run.</p>
                     <div id="chatWelcomeChips" class="flex flex-wrap justify-center gap-2" aria-label="Quick demo queries"></div>
                 </div>
             </div>
 
             <div class="chat-composer">
                 <label for="query" class="sr-only">Message</label>
-                <textarea id="query" name="query" rows="2" class="chat-input" placeholder="Try CU-CALC, CU-CURSOR, or CU-CANVAS — pick from Tasks…" autocomplete="off"></textarea>
+                <textarea id="query" name="query" rows="2" class="chat-input" placeholder="Try CU-CALC, CU-AX-NOTE, CU-CURSOR, CU-CANVAS, CU-MSG, or CU-MULTI — pick from Tasks…" autocomplete="off"></textarea>
                 <div id="formHint" class="mt-2 min-h-[1rem] text-xs text-amber-700" role="status" aria-live="polite"></div>
                 <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <div class="composer-actions">
@@ -2451,6 +2618,29 @@
                 </div>
             </div>
         </div>
+
+        <div id="dagWorkspaceTabs" role="tablist" aria-label="DAG workspace views">
+            <button type="button" id="dagSubTabGraphBtn" role="tab" aria-selected="true" class="dag-subtab is-active">Graph</button>
+            <button type="button" id="dagSubTabEvidenceBtn" role="tab" aria-selected="false" class="dag-subtab">Evidence</button>
+            <button type="button" id="dagSubTabReplayBtn" role="tab" aria-selected="false" class="dag-subtab">Replay</button>
+            <span class="dag-subtab-spacer"></span>
+            <button type="button" id="dagSubTabBackChatBtn" class="btn-shadcn btn-shadcn-ghost text-xs">← Chat</button>
+        </div>
+
+        <section id="evidenceListPanel" class="card-elevated flex min-h-0 flex-col rounded-2xl border border-zinc-200 bg-white shadow-sm" hidden aria-label="Task evidence">
+            <div class="evidence-list-toolbar">
+                <span class="evidence-list-toolbar-title">Task evidence</span>
+                <button type="button" id="evidenceRefreshBtn" class="btn-shadcn btn-shadcn-outline text-xs">Refresh</button>
+            </div>
+            <div class="evidence-list-body scrollbar-thin">
+                <p class="text-xs leading-snug text-zinc-500">Six primary-OS task categories recorded with <code class="rounded bg-zinc-100 px-1 py-0.5 text-[10px]">start_recording</code>. Click a run for the full action timeline, screenshots, and <strong>trajectory_dir</strong>.</p>
+                <div id="evidenceConstraintBadges" class="evidence-constraint-badges"></div>
+                <div id="evidenceTaskStatus" class="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3"></div>
+                <div id="evidenceRunsList" class="flex flex-col gap-2">
+                    <p class="text-xs text-zinc-400 py-4 text-center">Loading evidence…</p>
+                </div>
+            </div>
+        </section>
 
         <section id="dagGraphPanel" class="card-elevated scroll-mt-6 flex min-h-0 flex-col rounded-2xl border border-zinc-200 bg-white shadow-sm">
             <div class="dag-graph-toolbar">
@@ -2540,7 +2730,7 @@
                 <button type="button" id="evidenceOpenGraphBtn" class="btn-shadcn btn-shadcn-outline text-xs">Open DAG</button>
             </div>
             <div id="evidenceDetailBody" class="evidence-detail-body scrollbar-thin">
-                <p class="text-xs text-zinc-400 py-8 text-center">Select a run from the Evidence tab to inspect actions, timers, and recorded files.</p>
+                <p class="text-xs text-zinc-400 py-8 text-center">Select a run from the Evidence view to inspect actions, timers, and recorded files.</p>
             </div>
         </section>
 
@@ -2590,15 +2780,18 @@
     const streamLabel = document.getElementById('streamLabel');
     const sidebarTabChatBtn = document.getElementById('sidebarTabChatBtn');
     const sidebarTabTasksBtn = document.getElementById('sidebarTabTasksBtn');
-    const sidebarTabEvidenceBtn = document.getElementById('sidebarTabEvidenceBtn');
     const sidebarTabGraphBtn = document.getElementById('sidebarTabGraphBtn');
-    const sidebarTabReplayBtn = document.getElementById('sidebarTabReplayBtn');
     const browserTaskCount = document.getElementById('browserTaskCount');
     const panelOverview = document.getElementById('panelOverview');
     const panelTasks = document.getElementById('panelTasks');
-    const panelEvidence = document.getElementById('panelEvidence');
     const panelGraph = document.getElementById('panelGraph');
-    const panelReplay = document.getElementById('panelReplay');
+    const dagWorkspaceTabs = document.getElementById('dagWorkspaceTabs');
+    const dagSubTabGraphBtn = document.getElementById('dagSubTabGraphBtn');
+    const dagSubTabEvidenceBtn = document.getElementById('dagSubTabEvidenceBtn');
+    const dagSubTabReplayBtn = document.getElementById('dagSubTabReplayBtn');
+    const dagSubTabBackChatBtn = document.getElementById('dagSubTabBackChatBtn');
+    const evidenceListPanel = document.getElementById('evidenceListPanel');
+    const evidenceConstraintBadges = document.getElementById('evidenceConstraintBadges');
 
     const sidebarAside = document.getElementById('sidebarAside');
     const intentCard = document.getElementById('intentCard');
@@ -2740,21 +2933,24 @@
         el.style.height = Math.min(el.scrollHeight, 144) + 'px';
     }
 
-    const MAIN_VIEW_ORDER = ['chat', 'tasks', 'evidence', 'graph', 'replay'];
+    const MAIN_VIEW_ORDER = ['chat', 'tasks', 'dag'];
     const sidebarTabButtons = {
         chat: sidebarTabChatBtn,
         tasks: sidebarTabTasksBtn,
-        evidence: sidebarTabEvidenceBtn,
-        graph: sidebarTabGraphBtn,
-        replay: sidebarTabReplayBtn,
+        dag: sidebarTabGraphBtn,
     };
     const sidebarPanels = {
         chat: panelOverview,
         tasks: panelTasks,
-        evidence: panelEvidence,
-        graph: panelGraph,
-        replay: panelReplay,
+        dag: panelGraph,
     };
+    const DAG_SUBTABS = ['graph', 'evidence', 'replay'];
+    const dagSubTabButtons = {
+        graph: dagSubTabGraphBtn,
+        evidence: dagSubTabEvidenceBtn,
+        replay: dagSubTabReplayBtn,
+    };
+    let activeDagSubTab = 'graph';
     let activeMainView = 'chat';
     let pendingResultMarkdown = null;
     let chatTypingEl = null;
@@ -2783,7 +2979,7 @@
     let activeEvidenceTrajectoryDir = '';
     let browserReplayInFlightKey = '';
     const browserReplayCache = {};
-    const ASSIGNMENT_TASK_IDS = ['CU-CALC', 'CU-CURSOR', 'CU-CANVAS'];
+    const REQUIRED_TASK_IDS = ['CU-CALC', 'CU-AX-NOTE', 'CU-CURSOR', 'CU-CANVAS', 'CU-MSG', 'CU-MULTI'];
 
     function syncComposerControls() {
         const running = agentRunActive || serverAgentBusy;
@@ -3540,19 +3736,34 @@
     }
 
     function evidenceDetailVisible() {
-        return layoutMain && layoutMain.classList.contains('evidence-mode');
+        return (
+            layoutMain &&
+            layoutMain.classList.contains('evidence-mode') &&
+            layoutMain.classList.contains('evidence-detail-open')
+        );
     }
 
     function setEvidenceMode(on) {
         if (!layoutMain) return;
         layoutMain.classList.toggle('evidence-mode', !!on);
-        if (evidenceDetailPanel) evidenceDetailPanel.hidden = !on;
         if (on) {
             layoutMain.classList.remove('graph-mode');
             layoutMain.classList.remove('replay-mode');
             if (replayPanel) replayPanel.hidden = true;
+            if (evidenceListPanel) evidenceListPanel.hidden = false;
             stopDagGraphPolling();
+        } else {
+            layoutMain.classList.remove('evidence-detail-open');
+            if (evidenceListPanel) evidenceListPanel.hidden = true;
+            if (evidenceDetailPanel) evidenceDetailPanel.hidden = true;
         }
+    }
+
+    function setEvidenceDetailOpen(on) {
+        if (!layoutMain) return;
+        layoutMain.classList.toggle('evidence-detail-open', !!on);
+        if (evidenceDetailPanel) evidenceDetailPanel.hidden = !on;
+        if (evidenceListPanel) evidenceListPanel.hidden = !!on;
     }
 
     function replayPanelVisible() {
@@ -3627,7 +3838,8 @@
     }
 
     function openReplayView() {
-        setMainView('replay');
+        setMainView('dag');
+        setDagSubTab('replay');
     }
 
     function formatEvidenceElapsed(run) {
@@ -3768,8 +3980,11 @@
         if (!sessionId || !evidenceDetailBody) return Promise.resolve();
         activeEvidenceSessionId = sessionId;
         activeEvidenceNodeId = nodeId || null;
-        setMainView('evidence');
-        setEvidenceMode(true);
+        if (activeMainView !== 'dag' || activeDagSubTab !== 'evidence') {
+            setMainView('dag');
+            setDagSubTab('evidence');
+        }
+        setEvidenceDetailOpen(true);
         evidenceDetailBody.innerHTML =
             '<p class="text-xs text-zinc-400 py-8 text-center">Loading trajectory evidence…</p>';
         let url =
@@ -4006,6 +4221,9 @@
     }
 
     function collectReplayFrames(data) {
+        if (data && Array.isArray(data.frames) && data.frames.length) {
+            return data.frames.slice();
+        }
         const frames = [];
         (data.sections || []).forEach(function (sec) {
             (sec.screenshots || []).forEach(function (shot) {
@@ -4014,46 +4232,125 @@
                     caption: shot.caption || shot.path || 'frame',
                     path: shot.path || '',
                     section: sec.title || '',
+                    t_ms: shot.t_ms,
+                    turn: shot.turn,
+                    tool: shot.tool,
                 });
             });
         });
         return frames;
     }
 
+    function replayFramePosition(frames, idx) {
+        if (!frames.length) return 0;
+        const timed = frames.every(function (frame) {
+            return typeof frame.t_ms === 'number' && !isNaN(frame.t_ms);
+        });
+        if (timed) {
+            const maxMs = Math.max.apply(
+                null,
+                frames.map(function (frame) {
+                    return frame.t_ms;
+                })
+            );
+            if (maxMs > 0) {
+                return (frames[idx].t_ms / maxMs) * 100;
+            }
+        }
+        const denom = frames.length > 1 ? frames.length - 1 : 1;
+        return (idx / denom) * 100;
+    }
+
+    function replayChaptersFromFrames(frames) {
+        const chapters = [];
+        let lastStage = null;
+        frames.forEach(function (frame, idx) {
+            const stage = frame.section || 'Run';
+            if (stage !== lastStage) {
+                chapters.push({ label: stage, frameIndex: idx, caption: frame.caption || '' });
+                lastStage = stage;
+            }
+        });
+        return chapters;
+    }
+
     function renderReplayFrameViewer(frames) {
         if (!frames.length) return '';
         const first = frames[0];
-        let html = '<div class="replay-frame-viewer" data-replay-frame-viewer>';
-        html += '<div class="replay-frame-stage">';
+        const chapters = replayChaptersFromFrames(frames);
+        const framesJson = JSON.stringify(frames).replace(/</g, '\\u003c');
+        let html =
+            '<scr' +
+            'ipt type="application/json" class="replay-frames-data">' +
+            framesJson +
+            '</scr' +
+            'ipt>';
+        html += '<div class="replay-player" data-replay-player tabindex="0">';
+        // Screen + scrubber + controls
+        html += '<div class="replay-screen">';
+        html += '<div class="replay-stage">';
+        html +=
+            '<span class="replay-stage-badge" data-replay-stage>' +
+            dagEscapeHtml(first.section || 'Run') +
+            '</span>';
         html +=
             '<img data-replay-frame-img src="' +
             dagEscapeHtml(first.url) +
             '" alt="' +
             dagEscapeHtml(first.caption || 'Replay frame') +
             '" loading="eager" />';
+        html += '</div>';
+        html += '<div class="replay-scrubber">';
+        html += '<div class="replay-track" data-replay-track><div class="replay-track-fill" data-replay-fill></div>';
+        chapters.forEach(function (ch) {
+            const pct = replayFramePosition(frames, ch.frameIndex);
+            html +=
+                '<span class="replay-track-chapter" style="left:' +
+                pct.toFixed(2) +
+                '%" title="' +
+                dagEscapeHtml(ch.label) +
+                '"></span>';
+        });
+        html += '</div>';
+        html += '<div class="replay-controls">';
+        html += '<button type="button" data-replay-prev title="Previous frame">⏮ Prev</button>';
+        html += '<button type="button" class="replay-play" data-replay-play>▶ Play</button>';
+        html += '<button type="button" data-replay-next title="Next frame">Next ⏭</button>';
+        html += '<span class="replay-counter" data-replay-counter>1 / ' + frames.length + '</span>';
+        html +=
+            '<select class="replay-speed" data-replay-speed aria-label="Playback speed">' +
+            '<option value="1600">0.5×</option>' +
+            '<option value="800" selected>1×</option>' +
+            '<option value="400">2×</option>' +
+            '<option value="200">4×</option>' +
+            '</select>';
+        html += '</div>';
         html +=
             '<div class="replay-frame-caption" data-replay-frame-caption>Frame 1 of ' +
             frames.length +
             ' · ' +
             dagEscapeHtml(first.caption || '') +
-            '</div></div>';
-        html += '<div class="replay-frame-nav">';
-        html +=
-            '<div class="replay-frame-nav-head"><button type="button" data-replay-prev>Prev</button><button type="button" data-replay-next>Next</button></div>';
-        html += '<div class="replay-frame-list scrollbar-thin" data-replay-frame-list>';
-        frames.forEach(function (frame, idx) {
+            '</div>';
+        html += '</div>'; // .replay-screen
+        // Chapters list
+        html += '<div class="replay-chapters">';
+        html += '<div class="replay-chapters-title">Chapters</div>';
+        html += '<div class="replay-chapter-list scrollbar-thin" data-replay-chapters>';
+        chapters.forEach(function (ch, ci) {
             html +=
-                '<button type="button" data-replay-frame="' +
-                idx +
+                '<button type="button" data-replay-chapter="' +
+                ch.frameIndex +
                 '"' +
-                (idx === 0 ? ' class="active"' : '') +
+                (ci === 0 ? ' class="active"' : '') +
                 '>' +
-                (idx + 1) +
-                '. ' +
-                dagEscapeHtml(frame.caption || frame.path || 'frame') +
+                '<span class="chapter-stage">' +
+                dagEscapeHtml(ch.label) +
+                '</span>' +
+                dagEscapeHtml(ch.caption || ('Frame ' + (ch.frameIndex + 1))) +
                 '</button>';
         });
-        html += '</div></div></div>';
+        html += '</div></div>';
+        html += '</div>'; // .replay-player
         return html;
     }
 
@@ -4205,64 +4502,169 @@
         return fetchEvidenceReplay(sessionId, nodeId, 'computer');
     }
 
+    function bindReplayPlayer(player) {
+        if (!player || player.dataset.bound) return;
+        player.dataset.bound = '1';
+        let frames = [];
+        const dataEl =
+            (player.previousElementSibling &&
+                player.previousElementSibling.classList &&
+                player.previousElementSibling.classList.contains('replay-frames-data') &&
+                player.previousElementSibling) ||
+            player.querySelector('.replay-frames-data');
+        try {
+            if (dataEl && dataEl.textContent) {
+                frames = JSON.parse(dataEl.textContent);
+            } else {
+                frames = JSON.parse(player.getAttribute('data-replay-frames') || '[]');
+            }
+        } catch (err) {
+            frames = [];
+        }
+        if (!Array.isArray(frames) || !frames.length) return;
+        let current = 0;
+        let playing = false;
+        let timer = null;
+        let speedMs = 800;
+        const img = player.querySelector('[data-replay-frame-img]');
+        const stageBadge = player.querySelector('[data-replay-stage]');
+        const caption = player.querySelector('[data-replay-frame-caption]');
+        const counter = player.querySelector('[data-replay-counter]');
+        const fill = player.querySelector('[data-replay-fill]');
+        const track = player.querySelector('[data-replay-track]');
+        const playBtn = player.querySelector('[data-replay-play]');
+        const prevBtn = player.querySelector('[data-replay-prev]');
+        const nextBtn = player.querySelector('[data-replay-next]');
+        const speedSel = player.querySelector('[data-replay-speed]');
+        const chapterBtns = Array.from(player.querySelectorAll('[data-replay-chapter]'));
+
+        function frameIndexFromRatio(ratio) {
+            const timed = frames.every(function (frame) {
+                return typeof frame.t_ms === 'number' && !isNaN(frame.t_ms);
+            });
+            if (timed) {
+                const maxMs = Math.max.apply(
+                    null,
+                    frames.map(function (frame) {
+                        return frame.t_ms;
+                    })
+                );
+                if (maxMs > 0) {
+                    const targetMs = ratio * maxMs;
+                    let bestIdx = 0;
+                    let bestDelta = Infinity;
+                    frames.forEach(function (frame, idx) {
+                        const delta = Math.abs(frame.t_ms - targetMs);
+                        if (delta < bestDelta) {
+                            bestDelta = delta;
+                            bestIdx = idx;
+                        }
+                    });
+                    return bestIdx;
+                }
+            }
+            const denom = frames.length > 1 ? frames.length - 1 : 1;
+            return Math.round(ratio * denom);
+        }
+
+        function renderFrame() {
+            const frame = frames[current] || {};
+            if (img) {
+                img.src = frame.url || '';
+                img.alt = frame.caption || 'Replay frame';
+            }
+            if (stageBadge) stageBadge.textContent = frame.section || 'Run';
+            if (caption) {
+                caption.textContent =
+                    'Frame ' + (current + 1) + ' of ' + frames.length +
+                    (frame.caption ? ' · ' + frame.caption : '');
+            }
+            if (counter) counter.textContent = (current + 1) + ' / ' + frames.length;
+            if (fill) fill.style.width = replayFramePosition(frames, current).toFixed(2) + '%';
+            if (prevBtn) prevBtn.disabled = current <= 0;
+            if (nextBtn) nextBtn.disabled = current >= frames.length - 1;
+            if (playBtn) playBtn.disabled = frames.length < 2;
+            let activeChapter = 0;
+            chapterBtns.forEach(function (b, i) {
+                const fi = parseInt(b.getAttribute('data-replay-chapter'), 10) || 0;
+                if (fi <= current) activeChapter = i;
+            });
+            chapterBtns.forEach(function (b, i) {
+                b.classList.toggle('active', i === activeChapter);
+            });
+        }
+        function goTo(idx) {
+            current = Math.max(0, Math.min(frames.length - 1, idx));
+            renderFrame();
+        }
+        function stop() {
+            playing = false;
+            if (timer) { clearInterval(timer); timer = null; }
+            if (playBtn) playBtn.textContent = '▶ Play';
+        }
+        function tick() {
+            if (current >= frames.length - 1) { stop(); return; }
+            goTo(current + 1);
+        }
+        function play() {
+            if (frames.length < 2) return;
+            if (current >= frames.length - 1) current = 0;
+            playing = true;
+            if (playBtn) playBtn.textContent = '❚❚ Pause';
+            if (timer) clearInterval(timer);
+            timer = setInterval(tick, speedMs);
+            renderFrame();
+        }
+        function togglePlay() {
+            if (playing) stop();
+            else play();
+        }
+        if (playBtn) playBtn.addEventListener('click', togglePlay);
+        if (prevBtn) prevBtn.addEventListener('click', function () { stop(); goTo(current - 1); });
+        if (nextBtn) nextBtn.addEventListener('click', function () { stop(); goTo(current + 1); });
+        if (speedSel) {
+            speedSel.addEventListener('change', function () {
+                speedMs = parseInt(speedSel.value, 10) || 800;
+                if (playing) play();
+            });
+        }
+        if (track) {
+            track.addEventListener('click', function (e) {
+                const rect = track.getBoundingClientRect();
+                if (!rect.width) return;
+                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                stop();
+                goTo(frameIndexFromRatio(ratio));
+            });
+        }
+        chapterBtns.forEach(function (b) {
+            b.addEventListener('click', function () {
+                const fi = parseInt(b.getAttribute('data-replay-chapter'), 10) || 0;
+                stop();
+                goTo(fi);
+            });
+        });
+        player.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                stop();
+                goTo(current - 1);
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                stop();
+                goTo(current + 1);
+            } else if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                togglePlay();
+            }
+        });
+        renderFrame();
+    }
+
     function bindBrowserReplayToolbar() {
         if (!dagBrowserReplay) return;
-        const viewer = dagBrowserReplay.querySelector('[data-replay-frame-viewer]');
-        if (viewer && !viewer.dataset.bound) {
-            viewer.dataset.bound = '1';
-            let current = 0;
-            const img = viewer.querySelector('[data-replay-frame-img]');
-            const caption = viewer.querySelector('[data-replay-frame-caption]');
-            const buttons = Array.from(viewer.querySelectorAll('[data-replay-frame]'));
-            function showFrame(idx) {
-                if (!buttons.length) return;
-                current = Math.max(0, Math.min(buttons.length - 1, idx));
-                const btn = buttons[current];
-                const shot = btn.closest('[data-replay-frame-viewer]');
-                buttons.forEach(function (b, i) {
-                    b.classList.toggle('active', i === current);
-                });
-                const frameIdx = btn.getAttribute('data-replay-frame');
-                const figure = dagBrowserReplay.querySelector(
-                    '.browser-replay-shot[data-replay-shot="' + frameIdx + '"]'
-                );
-                const shotImg = figure && figure.querySelector('img');
-                const shotCaption = figure && figure.querySelector('figcaption');
-                if (img && shotImg) {
-                    img.src = shotImg.getAttribute('src') || '';
-                    img.alt = shotImg.getAttribute('alt') || 'Replay frame';
-                }
-                if (caption) {
-                    caption.textContent =
-                        'Frame ' +
-                        (current + 1) +
-                        ' of ' +
-                        buttons.length +
-                        ' · ' +
-                        (shotCaption ? shotCaption.textContent : btn.textContent || '');
-                }
-                if (shot) {
-                    btn.scrollIntoView({ block: 'nearest' });
-                }
-            }
-            buttons.forEach(function (btn, idx) {
-                btn.addEventListener('click', function () {
-                    showFrame(idx);
-                });
-            });
-            const prevBtn = viewer.querySelector('[data-replay-prev]');
-            const nextBtn = viewer.querySelector('[data-replay-next]');
-            if (prevBtn) {
-                prevBtn.addEventListener('click', function () {
-                    showFrame(current - 1);
-                });
-            }
-            if (nextBtn) {
-                nextBtn.addEventListener('click', function () {
-                    showFrame(current + 1);
-                });
-            }
-        }
+        const player = dagBrowserReplay.querySelector('[data-replay-player]');
+        if (player) bindReplayPlayer(player);
         const copyBtn = dagBrowserReplay.querySelector('[data-copy-replay]');
         if (copyBtn && !copyBtn.dataset.bound) {
             copyBtn.dataset.bound = '1';
@@ -4282,7 +4684,8 @@
     }
 
     function openGraphView() {
-        setMainView('graph');
+        setMainView('dag');
+        setDagSubTab('graph');
     }
 
     function loadGraphView(sessionId) {
@@ -4617,8 +5020,12 @@
 
     function setMainView(name) {
         activeMainView = name;
-        if (name !== 'evidence') setEvidenceMode(false);
-        if (name !== 'replay') setReplayMode(false);
+        if (name !== 'dag') {
+            setEvidenceMode(false);
+            setReplayMode(false);
+            setGraphMode(false);
+            stopDagGraphPolling();
+        }
         MAIN_VIEW_ORDER.forEach(function (id) {
             const selected = id === name;
             const btn = sidebarTabButtons[id];
@@ -4629,20 +5036,6 @@
             }
             if (panel) panel.classList.toggle('hidden', !selected);
         });
-        setGraphMode(name === 'graph');
-        if (name !== 'graph' && agentRunActive) {
-            if (!dagGraphAutoRefresh || !dagGraphAutoRefresh.checked) stopDagGraphPolling();
-        } else if (name !== 'graph') {
-            stopDagGraphPolling();
-        }
-        if (name === 'graph') {
-            void loadGraphView(activeDagSessionId || undefined).then(function () {
-                syncDagResumeButton();
-                if (dagGraphAutoRefresh && dagGraphAutoRefresh.checked) {
-                    startDagGraphPolling();
-                }
-            });
-        }
         if (name === 'tasks') {
             const list = document.getElementById('testCaseList');
             const stale =
@@ -4652,11 +5045,8 @@
                     /Loading tasks/.test(list.textContent || ''));
             if (stale) void loadBrowserQueries();
         }
-        if (name === 'evidence') {
-            void loadEvidencePanel(false);
-        }
-        if (name === 'replay') {
-            void loadReplayView(activeDagSessionId || undefined);
+        if (name === 'dag') {
+            setDagSubTab(activeDagSubTab || 'graph');
         }
         if (pendingResultMarkdown) {
             paintResultPanel(pendingResultMarkdown);
@@ -4664,12 +5054,55 @@
         }
     }
 
+    function setDagSubTab(sub) {
+        if (DAG_SUBTABS.indexOf(sub) < 0) sub = 'graph';
+        activeDagSubTab = sub;
+        if (activeMainView !== 'dag') activeMainView = 'dag';
+        DAG_SUBTABS.forEach(function (id) {
+            const btn = dagSubTabButtons[id];
+            if (!btn) return;
+            const selected = id === sub;
+            btn.classList.toggle('is-active', selected);
+            btn.setAttribute('aria-selected', selected ? 'true' : 'false');
+        });
+        setGraphMode(sub === 'graph');
+        setReplayMode(sub === 'replay');
+        setEvidenceMode(sub === 'evidence');
+        if (sub !== 'graph') {
+            if (!dagGraphAutoRefresh || !dagGraphAutoRefresh.checked || !agentRunActive) {
+                stopDagGraphPolling();
+            }
+        }
+        if (sub === 'graph') {
+            void loadGraphView(activeDagSessionId || undefined).then(function () {
+                syncDagResumeButton();
+                if (dagGraphAutoRefresh && dagGraphAutoRefresh.checked) {
+                    startDagGraphPolling();
+                }
+                scheduleDagGraphFit();
+            });
+        } else if (sub === 'evidence') {
+            void loadEvidencePanel(false);
+        } else if (sub === 'replay') {
+            void loadReplayView(activeDagSessionId || undefined);
+        }
+    }
+
     function activateTab(name) {
-        if (name === 'graph') setMainView('graph');
-        else if (name === 'replay') setMainView('replay');
-        else if (name === 'evidence') setMainView('evidence');
-        else if (name === 'testcases') setMainView('tasks');
-        else setMainView('chat');
+        if (name === 'graph') {
+            setMainView('dag');
+            setDagSubTab('graph');
+        } else if (name === 'replay') {
+            setMainView('dag');
+            setDagSubTab('replay');
+        } else if (name === 'evidence') {
+            setMainView('dag');
+            setDagSubTab('evidence');
+        } else if (name === 'testcases') {
+            setMainView('tasks');
+        } else {
+            setMainView('chat');
+        }
     }
 
     function mainViewIndex(id) {
@@ -4691,19 +5124,9 @@
     sidebarTabTasksBtn.addEventListener('click', function () {
         setMainView('tasks');
     });
-    if (sidebarTabEvidenceBtn) {
-        sidebarTabEvidenceBtn.addEventListener('click', function () {
-            setMainView('evidence');
-        });
-    }
     sidebarTabGraphBtn.addEventListener('click', function () {
-        openGraphView();
+        setMainView('dag');
     });
-    if (sidebarTabReplayBtn) {
-        sidebarTabReplayBtn.addEventListener('click', function () {
-            openReplayView();
-        });
-    }
 
     sidebarTabChatBtn.addEventListener('keydown', function (e) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
@@ -4720,35 +5143,34 @@
             focusMainViewByDelta('tasks', 1);
         }
     });
-    if (sidebarTabEvidenceBtn) {
-        sidebarTabEvidenceBtn.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                e.preventDefault();
-                focusMainViewByDelta('evidence', -1);
-            } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-                e.preventDefault();
-                focusMainViewByDelta('evidence', 1);
-            }
-        });
-    }
     sidebarTabGraphBtn.addEventListener('keydown', function (e) {
         if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
             e.preventDefault();
-            focusMainViewByDelta('graph', -1);
+            focusMainViewByDelta('dag', -1);
         } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
             e.preventDefault();
-            focusMainViewByDelta('graph', 1);
+            focusMainViewByDelta('dag', 1);
         }
     });
-    if (sidebarTabReplayBtn) {
-        sidebarTabReplayBtn.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                e.preventDefault();
-                focusMainViewByDelta('replay', -1);
-            } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-                e.preventDefault();
-                focusMainViewByDelta('replay', 1);
-            }
+
+    if (dagSubTabGraphBtn) {
+        dagSubTabGraphBtn.addEventListener('click', function () {
+            setDagSubTab('graph');
+        });
+    }
+    if (dagSubTabEvidenceBtn) {
+        dagSubTabEvidenceBtn.addEventListener('click', function () {
+            setDagSubTab('evidence');
+        });
+    }
+    if (dagSubTabReplayBtn) {
+        dagSubTabReplayBtn.addEventListener('click', function () {
+            setDagSubTab('replay');
+        });
+    }
+    if (dagSubTabBackChatBtn) {
+        dagSubTabBackChatBtn.addEventListener('click', function () {
+            setMainView('chat');
         });
     }
 
@@ -4760,7 +5182,7 @@
     }
     if (evidenceBackBtn) {
         evidenceBackBtn.addEventListener('click', function () {
-            setEvidenceMode(false);
+            setEvidenceDetailOpen(false);
         });
     }
     if (evidenceCopyTrajBtn) {
@@ -4777,8 +5199,8 @@
     if (evidenceOpenGraphBtn) {
         evidenceOpenGraphBtn.addEventListener('click', function () {
             if (!activeEvidenceSessionId) return;
-            setEvidenceMode(false);
-            openGraphView();
+            setEvidenceDetailOpen(false);
+            setDagSubTab('graph');
             void loadGraphView(activeEvidenceSessionId).then(function () {
                 const computerNode = findComputerNode(lastDagGraphPayload);
                 const nodeId = activeEvidenceNodeId || (computerNode && computerNode.id);
@@ -5412,6 +5834,13 @@
             scheduleDagGraphFit();
         });
     }
+    let dagResizeFitTimer = null;
+    window.addEventListener('resize', function () {
+        if (dagResizeFitTimer) clearTimeout(dagResizeFitTimer);
+        dagResizeFitTimer = setTimeout(function () {
+            if (dagGraphPanelVisible()) scheduleDagGraphFit();
+        }, 180);
+    });
     if (dagGraphDownloadBtn) {
         dagGraphDownloadBtn.addEventListener('click', downloadDagGraphPng);
     }
@@ -5494,21 +5923,24 @@
                     });
                     lastBrowserReplayKey = '';
                     const evidenceList = document.getElementById('evidenceRunsList');
-                    const evidenceStatus = document.getElementById('evidenceAssignmentStatus');
+                    const evidenceStatus = document.getElementById('evidenceTaskStatus');
                     if (evidenceList) {
                         evidenceList.innerHTML =
                             '<p class="text-xs text-zinc-400 py-4 text-center">No computer-use runs yet.</p>';
                     }
                     if (evidenceStatus) evidenceStatus.innerHTML = '';
+                    if (evidenceConstraintBadges) evidenceConstraintBadges.innerHTML = '';
                     setEvidenceMode(false);
                     setReplayMode(false);
+                    setGraphMode(false);
+                    setMainView('chat');
                     activeEvidenceSessionId = null;
                     activeEvidenceNodeId = null;
                     activeEvidenceTrajectoryDir = '';
                     evidenceDetailReportText = '';
                     if (evidenceDetailBody) {
                         evidenceDetailBody.innerHTML =
-                            '<p class="text-xs text-zinc-400 py-8 text-center">Select a run from the Evidence tab to inspect actions, timers, and recorded files.</p>';
+                            '<p class="text-xs text-zinc-400 py-8 text-center">Select a run from the Evidence view to inspect actions, timers, and recorded files.</p>';
                     }
                     void loadBrowserQueries();
                 } else {
@@ -5614,8 +6046,11 @@
     };
     const COMPUTER_QUERY_IDS = {
         'CU-CALC': true,
+        'CU-AX-NOTE': true,
         'CU-CURSOR': true,
         'CU-CANVAS': true,
+        'CU-MSG': true,
+        'CU-MULTI': true,
     };
     let dagSessionsById = {};
 
@@ -5629,26 +6064,75 @@
 
     function findBrowserNode(payload) {
         const nodes = (payload && payload.nodes) || [];
-        for (let i = 0; i < nodes.length; i += 1) {
-            if (nodes[i].skill === 'browser') return nodes[i];
-        }
-        return null;
+        const browserNodes = nodes.filter(function (n) {
+            return n.skill === 'browser';
+        });
+        if (!browserNodes.length) return null;
+        const complete = browserNodes.filter(function (n) {
+            return n.status === 'complete';
+        });
+        const pool = complete.length ? complete : browserNodes;
+        return pool[pool.length - 1];
     }
 
     function findComputerNode(payload) {
         const nodes = (payload && payload.nodes) || [];
-        for (let i = 0; i < nodes.length; i += 1) {
-            if (nodes[i].skill === 'computer') return nodes[i];
-        }
-        return null;
+        const computerNodes = nodes.filter(function (n) {
+            return n.skill === 'computer';
+        });
+        if (!computerNodes.length) return null;
+        const complete = computerNodes.filter(function (n) {
+            return n.status === 'complete';
+        });
+        const pool = complete.length ? complete : computerNodes;
+        return pool[pool.length - 1];
     }
 
     function openComputerEvidenceReport(sessionId, nodeId) {
         return openEvidenceDetailView(sessionId, nodeId);
     }
 
-    function renderEvidenceAssignmentStatus(runs) {
-        const host = document.getElementById('evidenceAssignmentStatus');
+    function renderEvidenceConstraintBadges(runs) {
+        const host = evidenceConstraintBadges;
+        if (!host) return;
+        const ready = (runs || []).filter(function (r) {
+            return r && r.recording_ok && r.path;
+        });
+        const paths = ready.map(function (r) {
+            return String(r.path || '').toLowerCase();
+        });
+        const constraints = [
+            {
+                label: 'Vision used (Layer 3)',
+                met: paths.indexOf('vision') >= 0,
+            },
+            {
+                label: 'Electron page path',
+                met: paths.indexOf('electron') >= 0,
+            },
+            {
+                label: 'Zero-vision run',
+                met: paths.some(function (p) {
+                    return p && p !== 'vision';
+                }),
+            },
+        ];
+        host.innerHTML = constraints
+            .map(function (c) {
+                return (
+                    '<span class="evidence-constraint-badge ' +
+                    (c.met ? 'met' : 'unmet') +
+                    '">' +
+                    (c.met ? '✓ ' : '○ ') +
+                    escapeHtml(c.label) +
+                    '</span>'
+                );
+            })
+            .join('');
+    }
+
+    function renderEvidenceTaskStatus(runs) {
+        const host = document.getElementById('evidenceTaskStatus');
         if (!host) return;
         const latestByTask = {};
         (runs || []).forEach(function (run) {
@@ -5658,12 +6142,12 @@
                 latestByTask[run.query_id] = run;
             }
         });
-        let html = '<h3 class="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Assignment progress</h3><div class="assignment-grid mt-2">';
-        ASSIGNMENT_TASK_IDS.forEach(function (qid) {
+        let html = '<h3 class="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Task progress</h3><div class="task-progress-grid mt-2">';
+        REQUIRED_TASK_IDS.forEach(function (qid) {
             const run = latestByTask[qid];
             const ok = run && run.recording_ok && run.path;
             html +=
-                '<div class="assignment-item"><div><strong>' +
+                '<div class="task-progress-item"><div><strong>' +
                 escapeHtml(qid) +
                 '</strong><span>' +
                 (run
@@ -5693,7 +6177,7 @@
         if (!list) return;
         if (!runs || !runs.length) {
             list.innerHTML =
-                '<p class="text-xs text-zinc-400 py-4 text-center">No computer-use runs yet. Run CU-CALC, CU-CURSOR, or CU-CANVAS from Tasks.</p>';
+                '<p class="text-xs text-zinc-400 py-4 text-center">No computer-use runs yet. Run a CU-* task from Tasks.</p>';
             return;
         }
         list.innerHTML = '';
@@ -5766,7 +6250,8 @@
                 if (!body || body.status !== 'success') {
                     throw new Error((body && body.detail) || 'Failed to load evidence');
                 }
-                renderEvidenceAssignmentStatus(body.runs || []);
+                renderEvidenceConstraintBadges(body.runs || []);
+                renderEvidenceTaskStatus(body.runs || []);
                 renderEvidenceRunsList(body.runs || []);
             })
             .catch(function (err) {
@@ -5782,7 +6267,10 @@
     function openBrowserReplayForSession(sessionId, opts) {
         opts = opts || {};
         if (!sessionId) return Promise.resolve();
-        setMainView('replay');
+        if (activeMainView !== 'dag' || activeDagSubTab !== 'replay') {
+            setMainView('dag');
+            setDagSubTab('replay');
+        }
         return loadReplayView(sessionId);
     }
 
@@ -6054,6 +6542,7 @@
     function computerTaskIconSrc(q) {
         const id = String((q && q.id) || '');
         if (id === 'CU-CALC') return '/Images/icon-calc.svg';
+        if (id === 'CU-MULTI') return '/Images/icon-calc.svg';
         if (id === 'CU-CURSOR') return '/Images/icon-cursor-app.svg';
         if (id === 'CU-CANVAS') return '/Images/icon-canvas.svg';
         return '/Images/app-icon.svg';
@@ -6193,8 +6682,11 @@
 
     const WELCOME_DEMO_IDS = [
         { id: 'CU-CALC', chipClass: 'dag-welcome-chip dag-welcome-chip-calc', label: 'CU-CALC', icon: '/Images/icon-calc.svg' },
+        { id: 'CU-AX-NOTE', chipClass: 'dag-welcome-chip', label: 'CU-AX-NOTE', icon: '/Images/app-icon.svg' },
         { id: 'CU-CURSOR', chipClass: 'dag-welcome-chip dag-welcome-chip-cursor', label: 'CU-CURSOR', icon: '/Images/icon-cursor-app.svg' },
         { id: 'CU-CANVAS', chipClass: 'dag-welcome-chip dag-welcome-chip-canvas', label: 'CU-CANVAS', icon: '/Images/icon-canvas.svg' },
+        { id: 'CU-MSG', chipClass: 'dag-welcome-chip', label: 'CU-MSG', icon: '/Images/app-icon.svg' },
+        { id: 'CU-MULTI', chipClass: 'dag-welcome-chip dag-welcome-chip-calc', label: 'CU-MULTI', icon: '/Images/icon-calc.svg' },
     ];
 
     function renderWelcomeDemoChips(queriesById) {
