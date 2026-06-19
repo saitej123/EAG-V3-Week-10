@@ -170,16 +170,6 @@ async def lifespan(app: FastAPI):
         logger.warning(f"[startup] Playwright Chromium not ready: {pw_err}")
     else:
         logger.info("[startup] Playwright Chromium ready for browser skill")
-        try:
-            from computer_use_agent.persistence import SessionStore
-
-            if not SessionStore("dag_COMP_ref").exists():
-                from scripts.browser.seed_browser_sessions import seed_browser_reference_sessions
-
-                seeded = await asyncio.to_thread(seed_browser_reference_sessions)
-                logger.info(f"[startup] Seeded browser replay demos: {seeded}")
-        except Exception as e:
-            logger.warning(f"[startup] browser replay seed skipped: {e}")
     yield
     _app_loop_holder["loop"] = None
     log_queue = None
@@ -842,25 +832,6 @@ async def api_dag_queries():
         return {"status": "success", **assignment_payload()}
     except Exception as e:
         logger.error(f"[UI] DAG queries failed: {e}")
-        return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
-
-
-@app.post("/api/browser/reseed-sessions")
-async def api_browser_reseed_sessions():
-    """Re-create browser reference sessions (dag_*_ref) after state reset — UI replay demos."""
-    with _ops_lock:
-        if _run_busy:
-            return JSONResponse(
-                {"status": "busy", "detail": "Cannot reseed while an agent run is in progress."},
-                status_code=400,
-            )
-    try:
-        from scripts.browser.seed_browser_sessions import seed_browser_reference_sessions
-
-        created = await asyncio.to_thread(seed_browser_reference_sessions)
-        return {"status": "success", "session_ids": created}
-    except Exception as e:
-        logger.error(f"[UI] browser reseed failed: {e}")
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
 
 

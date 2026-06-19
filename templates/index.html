@@ -4359,9 +4359,6 @@
         let html =
             '<div class="browser-replay-toolbar">' +
             '<button type="button" data-copy-replay>Copy report</button>';
-        if (!isComputer) {
-            html += '<button type="button" data-load-comp-ref>Load COMP demo</button>';
-        }
         html += '</div>';
         html += renderReplayFrameViewer(frames);
         let frameRenderIndex = 0;
@@ -4670,13 +4667,6 @@
                 navigator.clipboard
                     .writeText(dagBrowserReplay.dataset.reportText || dagBrowserReplay.textContent || '')
                     .catch(function () {});
-            });
-        }
-        const demoBtn = dagBrowserReplay.querySelector('[data-load-comp-ref]');
-        if (demoBtn && !demoBtn.dataset.bound) {
-            demoBtn.dataset.bound = '1';
-            demoBtn.addEventListener('click', function () {
-                void openBrowserReplayForSession('dag_COMP_ref');
             });
         }
     }
@@ -6396,14 +6386,6 @@
                     loadDagQueryIntoComposer(qrow.query, true, dq.query_id);
                 });
                 actions.appendChild(run);
-                const demo = document.createElement('button');
-                demo.type = 'button';
-                demo.className = 'dag-design-run';
-                demo.textContent = 'Open COMP replay demo';
-                demo.addEventListener('click', function () {
-                    void openBrowserReplayForSession('dag_COMP_ref');
-                });
-                actions.appendChild(demo);
             }
             if (dq.layer_demos && dq.layer_demos.length && actions) {
                 const layerRow = document.createElement('div');
@@ -6419,14 +6401,6 @@
                         loadDagQueryIntoComposer(layerQ.query, true, lid);
                     });
                     layerRow.appendChild(runLayer);
-                    const replayLayer = document.createElement('button');
-                    replayLayer.type = 'button';
-                    replayLayer.className = 'dag-design-run';
-                    replayLayer.textContent = lid + ' replay';
-                    replayLayer.addEventListener('click', function () {
-                        void openBrowserReplayForSession('dag_' + lid + '_ref');
-                    });
-                    layerRow.appendChild(replayLayer);
                 });
                 actions.appendChild(layerRow);
             }

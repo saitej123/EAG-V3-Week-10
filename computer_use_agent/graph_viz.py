@@ -493,6 +493,11 @@ def prepare_formatter_replay(session_id: str) -> bool:
     return changed
 
 
+def _is_legacy_browser_ref_session(session_id: str) -> bool:
+    """Skip seeded browser demo folders (dag_B1_ref, dag_COMP_ref, etc.)."""
+    return session_id.startswith("dag_") and session_id.endswith("_ref")
+
+
 def list_dag_sessions(*, limit: int = 30) -> list[dict[str, Any]]:
     """Recent session folders that contain graph.json, newest first."""
     sessions_dir = persistence.SESSIONS_DIR
@@ -501,6 +506,9 @@ def list_dag_sessions(*, limit: int = 30) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for path in sessions_dir.iterdir():
         if not path.is_dir():
+            continue
+        sid = path.name
+        if _is_legacy_browser_ref_session(sid):
             continue
         graph_path = path / "graph.json"
         if not graph_path.is_file():
@@ -512,7 +520,6 @@ def list_dag_sessions(*, limit: int = 30) -> list[dict[str, Any]]:
             query = qpath.read_text(encoding="utf-8", errors="replace").strip()
             if len(query) > 120:
                 query = query[:117] + "…"
-        sid = path.name
         resume = session_resume_meta(sid)
         rows.append(
             {

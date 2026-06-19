@@ -237,7 +237,14 @@ def test_multi_page_partial_continues_to_vlm(monkeypatch):
     asyncio.run(_run())
 
 
-def test_reference_sessions_match_corpus():
+@pytest.fixture
+def browser_reference_sessions():
+    from scripts.browser.seed_browser_sessions import seed_browser_reference_sessions
+
+    return seed_browser_reference_sessions()
+
+
+def test_reference_sessions_match_corpus(browser_reference_sessions):
     import json
     from pathlib import Path
 
@@ -257,7 +264,7 @@ def test_reference_sessions_match_corpus():
         assert abs(float(row["elapsed_s"]) - ref["wall_clock_sec"]) < 0.05
 
 
-def test_browser_replay_report_on_reference_session():
+def test_browser_replay_report_on_reference_session(browser_reference_sessions):
     from computer_use_agent.browser.replay import build_browser_replay_report
 
     report = build_browser_replay_report("dag_B3_ref")
@@ -268,7 +275,7 @@ def test_browser_replay_report_on_reference_session():
     assert report["sections"][0]["title"] == "Original user goal"
 
 
-def test_comp_replay_has_comparison_table():
+def test_comp_replay_has_comparison_table(browser_reference_sessions):
     from computer_use_agent.browser.replay import build_browser_replay_report
 
     report = build_browser_replay_report("dag_COMP_ref")

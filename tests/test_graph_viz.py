@@ -142,6 +142,22 @@ def test_api_dag_graph_formatter_running_mid_wave(tmp_path, monkeypatch):
     assert fmt["color"]["background"] == "#fef3c7"
 
 
+def test_list_dag_sessions_skips_legacy_browser_ref_sessions(tmp_path, monkeypatch):
+    from computer_use_agent import persistence as pers_mod
+
+    monkeypatch.setattr(pers_mod, "SESSIONS_DIR", tmp_path / "sessions")
+    for sid in ("dag_CU-CALC_live01", "dag_B1_ref", "dag_COMP_ref"):
+        store = SessionStore(sid)
+        store.ensure_dirs()
+        store.save_query(sid)
+        store.graph_path.write_text(
+            json.dumps(nx.node_link_data(nx.DiGraph()), indent=2),
+            encoding="utf-8",
+        )
+    rows = list_dag_sessions()
+    assert [r["session_id"] for r in rows] == ["dag_CU-CALC_live01"]
+
+
 def test_list_dag_sessions_orders_newest(tmp_path, monkeypatch):
     from computer_use_agent import persistence as pers_mod
 

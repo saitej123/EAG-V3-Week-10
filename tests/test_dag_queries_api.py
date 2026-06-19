@@ -240,19 +240,6 @@ def test_api_browser_queries_success():
     assert body["outline"][4]["query_ids"] == COMPUTER_IDS
 
 
-def test_api_browser_reseed_sessions():
-    from app import app
-
-    client = TestClient(app)
-    res = client.post("/api/browser/reseed-sessions")
-    assert res.status_code == 200
-    body = res.json()
-    assert body["status"] == "success"
-    assert "dag_COMP_ref" in body["session_ids"]
-    assert len(body["session_ids"]) == 5
-
-
-def test_api_browser_playwright_status():
     from app import app
 
     client = TestClient(app)
