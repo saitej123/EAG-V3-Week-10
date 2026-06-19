@@ -13,6 +13,12 @@ Computer Use Agent adds a `computer` skill to the DAG catalogue, drives primary-
 
 The computer-use skill uses direct Gemini SDK calls for text and vision judgment. Deterministic work stays in `cua-driver` actions, and vision is called only when the cascade reaches Layer 3.
 
+## Demo video
+
+Watch a walkthrough of the agent running computer-use tasks in the UI:
+
+**[Computer Use Agent demo (YouTube)](https://www.youtube.com/watch?v=otgYQcIk2f8)**
+
 ## Quick Start
 
 ```bash
