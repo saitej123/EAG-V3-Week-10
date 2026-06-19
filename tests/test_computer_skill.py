@@ -150,6 +150,25 @@ def test_canvas_wait_accepts_new_browser_window(monkeypatch):
     assert (pid, wid) == (11, 12)
 
 
+def test_red_blob_center_uses_largest_connected_component():
+    import base64
+    import io
+
+    from PIL import Image, ImageDraw
+
+    from computer_use_agent.computer import layer3_vision as vision_mod
+
+    im = Image.new("RGB", (1000, 900), "white")
+    draw = ImageDraw.Draw(im)
+    draw.rectangle((900, 20, 980, 80), fill="red")  # red browser/UI artifact
+    draw.ellipse((300, 500, 500, 700), fill="red")  # actual canvas target
+    buf = io.BytesIO()
+    im.save(buf, format="PNG")
+    image_url = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+    assert vision_mod._red_blob_center(image_url) == (400, 600)
+
+
 @pytest.mark.asyncio
 async def test_canvas_vision_falls_back_to_red_blob_click(monkeypatch):
     import base64
@@ -369,6 +388,56 @@ async def test_hotkey_script_retargets_after_second_launch(monkeypatch):
     assert typed[-1] == {"pid": 20, "window_id": 21, "text": "Calculator result: 248171"}
 
 
+@pytest.mark.asyncio
+async def test_hotkey_multi_app_success_uses_last_typed_text(monkeypatch):
+    from computer_use_agent.computer import layer2a_hotkey as hotkey_mod
+
+    class FakeClient:
+        def ensure_daemon(self):
+            return None
+
+        def launch_app_named(self, name, **kwargs):
+            if name == "Calculator":
+                return {"pid": 10, "windows": [{"pid": 10, "window_id": 11, "title": "Calculator"}]}
+            if name == "Notepad":
+                return {"pid": 20, "windows": [{"pid": 20, "window_id": 21, "title": "Notepad"}]}
+            return {}
+
+        def list_windows(self, pid=None):
+            wins = [
+                {"pid": 10, "window_id": 11, "title": "Calculator", "app_name": "Calculator.exe"},
+                {"pid": 20, "window_id": 21, "title": "Notepad", "app_name": "Notepad.exe"},
+            ]
+            if pid is not None:
+                wins = [w for w in wins if w["pid"] == pid]
+            return {"windows": wins}
+
+        def type_text(self, pid, text, **kwargs):
+            return {}
+
+        def get_window_state(self, pid, window_id, **kwargs):
+            return {"tree_markdown": ""}
+
+        def click(self, **kwargs):
+            return {}
+
+    monkeypatch.setattr(hotkey_mod, "_type_calculator_expr", lambda *a, **k: {"snapshot": {}})
+
+    out = await hotkey_mod.run_hotkey_script(
+        FakeClient(),
+        [
+            {"tool": "launch_app", "args": {"name": "Calculator"}},
+            {"tool": "type_text", "args": {"text": "847*293="}},
+            {"tool": "launch_app", "args": {"name": "Notepad"}},
+            {"tool": "type_text", "args": {"text": "Calculator result: 248171"}},
+        ],
+        app="Calculator",
+    )
+
+    assert out["success"] is True
+    assert out["result"] == "Calculator result: 248171"
+
+
 def test_cua_response_normalization():
     plan = normalize_action_plan([{"type": "done", "success": True, "note": "ok"}])
     assert plan["actions"][0]["type"] == "done"
@@ -377,10 +446,30 @@ def test_cua_response_normalization():
 
 
 @pytest.mark.asyncio
-async def test_electron_accepts_list_llm_plan(monkeypatch):
+async def test_electron_accepts_list_llm_plan(monkeypatch, tmp_path):
+    calls = []
+
     class FakeClient:
         def list_windows(self, pid=None):
             return {"windows": [{"pid": 1, "window_id": 2, "title": "Cursor", "app_name": "Cursor.exe"}]}
+
+        def page(self, pid, action, **kwargs):
+            calls.append({"tool": "page", "pid": pid, "action": action, **kwargs})
+            if action == "get_text":
+                return {"text": "Cursor workbench computer-use layer2b ok"}
+            return {"ok": True}
+
+        def hotkey(self, keys, **kwargs):
+            calls.append({"tool": "hotkey", "keys": keys, **kwargs})
+            return {}
+
+        def type_text(self, pid, text, **kwargs):
+            calls.append({"tool": "type_text", "pid": pid, "text": text, **kwargs})
+            return {}
+
+        def press_key(self, key, **kwargs):
+            calls.append({"tool": "press_key", "key": key, **kwargs})
+            return {}
 
     class FakeLLM:
         async def chat(self, **kwargs):
@@ -390,16 +479,19 @@ async def test_electron_accepts_list_llm_plan(monkeypatch):
 
             return R()
 
-    monkeypatch.setattr(electron_mod, "_page_text", lambda *args, **kwargs: "computer-use layer2b ok")
+    monkeypatch.chdir(tmp_path)
 
     result = await electron_mod.run_electron(
         FakeClient(),
         FakeLLM(),
         app="Cursor",
-        goal="update notes/computer_use_evidence.txt",
+        goal="update notes/computer_use_evidence.txt with computer-use layer2b ok",
         electron_port=9222,
     )
     assert result.success is True
+    assert (tmp_path / "notes" / "computer_use_evidence.txt").read_text(encoding="utf-8").strip() == "computer-use layer2b ok"
+    assert any(c["tool"] == "page" and c["action"] == "execute_javascript" for c in calls)
+    assert any(c["tool"] == "hotkey" for c in calls)
 
 
 @pytest.mark.asyncio
@@ -416,6 +508,9 @@ async def test_ax_reuses_existing_matching_window(monkeypatch):
         def get_window_state(self, pid, window_id, **kwargs):
             assert (pid, window_id) == (77, 88)
             return {"markdown": "Untitled - Notepad\nAX layer verified for notes"}
+
+        def type_text(self, pid, text, **kwargs):
+            return {}
 
     class FakeLLM:
         async def chat(self, **kwargs):
@@ -457,6 +552,9 @@ async def test_ax_waits_for_window_after_launch(monkeypatch):
             assert (pid, window_id) == (91, 92)
             return {"markdown": "Untitled - Notepad\nAX layer verified for notes"}
 
+        def type_text(self, pid, text, **kwargs):
+            return {}
+
     class FakeLLM:
         async def chat(self, **kwargs):
             class R:
@@ -477,6 +575,39 @@ async def test_ax_waits_for_window_after_launch(monkeypatch):
     assert result.success is True
     assert result.pid == 91
     assert result.window_id == 92
+
+
+@pytest.mark.asyncio
+async def test_ax_fixed_notepad_task_types_and_verifies_without_llm():
+    from computer_use_agent.computer import layer2b_ax as ax_mod
+
+    typed = {"text": ""}
+
+    class FakeClient:
+        def list_windows(self, pid=None):
+            return {"windows": [{"pid": 31, "window_id": 32, "title": "Untitled - Notepad", "app_name": "Notepad.exe"}]}
+
+        def get_window_state(self, pid, window_id, **kwargs):
+            return {"markdown": "Untitled - Notepad\n" + typed["text"]}
+
+        def type_text(self, pid, text, **kwargs):
+            typed["text"] = text
+            return {}
+
+    class FakeLLM:
+        async def chat(self, **kwargs):
+            raise AssertionError("fixed Notepad AX tasks should not need the LLM loop")
+
+    result = await ax_mod.run_ax(
+        FakeClient(),
+        FakeLLM(),
+        app="Notepad",
+        goal="Open Notepad and create a short status note that says 'AX layer verified for notes'.",
+    )
+
+    assert result.success is True
+    assert typed["text"] == "AX layer verified for notes"
+    assert result.actions[-1]["verified"] is True
 
 
 def test_infer_calculator_display_indian_grouping():

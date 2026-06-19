@@ -194,3 +194,54 @@ def test_build_replay_frames_uses_turn_screenshots(tmp_path, monkeypatch):
     assert len(frames) == 2
     assert frames[0]["path"] == "turn-00001/screenshot.png"
     assert frames[1]["t_ms"] == 900
+
+
+def test_hyphenated_cu_task_ids_are_replayable(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    state_root = tmp_path / "state" / "sessions" / "dag_CU-AX-NOTE_test01"
+    traj = state_root / "computer" / "trajectory_ax"
+    turn_dir = traj / "turn-00001"
+    turn_dir.mkdir(parents=True)
+    (traj / "manifest.json").write_text("{}", encoding="utf-8")
+    (turn_dir / "action.json").write_text(
+        json.dumps(
+            {
+                "tool": "get_window_state",
+                "arguments": {"capture_mode": "ax"},
+                "result_summary": "Captured Notepad AX tree",
+                "t_ms_from_session_start": 42,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (turn_dir / "screenshot.png").write_bytes(b"\x89PNG\r\n")
+
+    store = SessionStore("dag_CU-AX-NOTE_test01")
+    store.save_query("Run CU-AX-NOTE")
+    graph = nx.DiGraph()
+    graph.add_node("n:2", skill="computer")
+    store.save_graph(graph)
+    store.save_node_state(
+        NodeState(
+            node_id="n:2",
+            skill="computer",
+            status=NodeStatus.complete,
+            output=json.dumps(
+                {
+                    "app": "Notepad",
+                    "goal": "AX layer verified for notes",
+                    "path": "ax",
+                    "result": "AX layer verified for notes",
+                    "actions": [{"type": "type_text", "text": "AX layer verified for notes"}],
+                    "trajectory_dir": str(traj.resolve()),
+                }
+            ),
+        )
+    )
+
+    report = build_computer_replay_report("dag_CU-AX-NOTE_test01")
+
+    assert report["query_id"] == "CU-AX-NOTE"
+    assert report["available"] is True
+    assert report["frames"]
+    assert any(r["session_id"] == "dag_CU-AX-NOTE_test01" for r in list_computer_evidence_sessions())

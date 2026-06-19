@@ -2633,7 +2633,7 @@
                 <button type="button" id="evidenceRefreshBtn" class="btn-shadcn btn-shadcn-outline text-xs">Refresh</button>
             </div>
             <div class="evidence-list-body scrollbar-thin">
-                <p class="text-xs leading-snug text-zinc-500">Six primary-OS task categories recorded with <code class="rounded bg-zinc-100 px-1 py-0.5 text-[10px]">start_recording</code>. Click a run for the full action timeline, screenshots, and <strong>trajectory_dir</strong>.</p>
+                <p class="text-xs leading-snug text-zinc-500">Evidence for the selected task/session recorded with <code class="rounded bg-zinc-100 px-1 py-0.5 text-[10px]">start_recording</code>. Click the run for the full action timeline, screenshots, and <strong>trajectory_dir</strong>.</p>
                 <div id="evidenceConstraintBadges" class="evidence-constraint-badges"></div>
                 <div id="evidenceTaskStatus" class="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3"></div>
                 <div id="evidenceRunsList" class="flex flex-col gap-2">
@@ -2979,8 +2979,6 @@
     let activeEvidenceTrajectoryDir = '';
     let browserReplayInFlightKey = '';
     const browserReplayCache = {};
-    const REQUIRED_TASK_IDS = ['CU-CALC', 'CU-AX-NOTE', 'CU-CURSOR', 'CU-CANVAS', 'CU-MSG', 'CU-MULTI'];
-
     function syncComposerControls() {
         const running = agentRunActive || serverAgentBusy;
         if (runBtn) {
@@ -6092,6 +6090,25 @@
         return openEvidenceDetailView(sessionId, nodeId);
     }
 
+    function selectedEvidenceRuns(runs) {
+        const allRuns = Array.isArray(runs) ? runs : [];
+        if (!allRuns.length) return [];
+        const selectedSession =
+            activeDagSessionId ||
+            (dagGraphSessionSelect && dagGraphSessionSelect.value) ||
+            (replaySessionSelect && replaySessionSelect.value) ||
+            activeEvidenceSessionId ||
+            '';
+        if (selectedSession) {
+            const matchingSession = allRuns.filter(function (run) {
+                return String(run.session_id || '') === String(selectedSession);
+            });
+            if (matchingSession.length) return matchingSession;
+            return [];
+        }
+        return [allRuns[0]];
+    }
+
     function renderEvidenceConstraintBadges(runs) {
         const host = evidenceConstraintBadges;
         if (!host) return;
@@ -6134,41 +6151,44 @@
     function renderEvidenceTaskStatus(runs) {
         const host = document.getElementById('evidenceTaskStatus');
         if (!host) return;
-        const latestByTask = {};
-        (runs || []).forEach(function (run) {
-            if (!run.query_id) return;
-            const prev = latestByTask[run.query_id];
-            if (!prev || String(run.session_id || '') > String(prev.session_id || '')) {
-                latestByTask[run.query_id] = run;
-            }
-        });
-        let html = '<h3 class="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Task progress</h3><div class="task-progress-grid mt-2">';
-        REQUIRED_TASK_IDS.forEach(function (qid) {
-            const run = latestByTask[qid];
-            const ok = run && run.recording_ok && run.path;
-            html +=
-                '<div class="task-progress-item"><div><strong>' +
-                escapeHtml(qid) +
-                '</strong><span>' +
-                (run
-                    ? 'path=' +
-                      escapeHtml(String(run.path || '?')) +
-                      ' · actions=' +
-                      escapeHtml(String(run.action_count || 0)) +
-                      ' · ' +
-                      (run.recording_ok ? 'recording ok' : 'recording missing')
-                    : 'No run yet — launch from Tasks') +
-                '</span>' +
-                (run
-                    ? '<span class="' +
-                      (ok ? 'evidence-status-ok' : 'evidence-status-bad') +
-                      ' mt-1">' +
-                      escapeHtml(ok ? 'evidence ready' : 'evidence incomplete') +
-                      '</span>'
-                    : '') +
-                '</div></div>';
-        });
-        html += '</div>';
+        const run = (runs || [])[0] || null;
+        if (!run) {
+            const selectedSession =
+                activeDagSessionId ||
+                activeEvidenceSessionId ||
+                (dagGraphSessionSelect && dagGraphSessionSelect.value) ||
+                '';
+            host.innerHTML =
+                '<h3 class="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Selected task evidence</h3>' +
+                '<p class="mt-2 text-xs text-zinc-500">' +
+                (selectedSession
+                    ? 'No evidence found for selected session ' + escapeHtml(selectedSession) + '.'
+                    : 'Select or run a task to see its evidence here.') +
+                '</p>';
+            return;
+        }
+        const ok = run.recording_ok && run.path;
+        let html =
+            '<h3 class="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Selected task evidence</h3>' +
+            '<div class="task-progress-grid mt-2">' +
+            '<div class="task-progress-item"><div><strong>' +
+            escapeHtml(String(run.query_id || 'computer')) +
+            '</strong><span>' +
+            'session=' +
+            escapeHtml(String(run.session_id || '?')) +
+            ' · path=' +
+            escapeHtml(String(run.path || '?')) +
+            ' · actions=' +
+            escapeHtml(String(run.action_count || 0)) +
+            ' · ' +
+            (run.recording_ok ? 'recording ok' : 'recording missing') +
+            '</span>' +
+            '<span class="' +
+            (ok ? 'evidence-status-ok' : 'evidence-status-bad') +
+            ' mt-1">' +
+            escapeHtml(ok ? 'evidence ready' : 'evidence incomplete') +
+            '</span>' +
+            '</div></div></div>';
         host.innerHTML = html;
     }
 
@@ -6177,7 +6197,7 @@
         if (!list) return;
         if (!runs || !runs.length) {
             list.innerHTML =
-                '<p class="text-xs text-zinc-400 py-4 text-center">No computer-use runs yet. Run a CU-* task from Tasks.</p>';
+                '<p class="text-xs text-zinc-400 py-4 text-center">No evidence for the selected task/session yet. Run it from Tasks.</p>';
             return;
         }
         list.innerHTML = '';
@@ -6240,7 +6260,6 @@
 
     function loadEvidencePanel(force) {
         const list = document.getElementById('evidenceRunsList');
-        if (!force && list && list.querySelector('.evidence-run-card')) return Promise.resolve();
         if (list) list.innerHTML = '<p class="text-xs text-zinc-400 py-4 text-center">Loading evidence…</p>';
         return fetch('/api/dag/computer-evidence')
             .then(function (r) {
@@ -6250,9 +6269,10 @@
                 if (!body || body.status !== 'success') {
                     throw new Error((body && body.detail) || 'Failed to load evidence');
                 }
-                renderEvidenceConstraintBadges(body.runs || []);
-                renderEvidenceTaskStatus(body.runs || []);
-                renderEvidenceRunsList(body.runs || []);
+                const selectedRuns = selectedEvidenceRuns(body.runs || []);
+                renderEvidenceConstraintBadges(selectedRuns);
+                renderEvidenceTaskStatus(selectedRuns);
+                renderEvidenceRunsList(selectedRuns);
             })
             .catch(function (err) {
                 if (list) {

@@ -80,6 +80,58 @@ The task catalogue covers the requested primary-OS computer-use categories. Each
 | Multi-app workflow is exercised | `CU-MULTI` |
 | Every run calls **start_recording** | All six CU tasks |
 
+### Task screenshots
+
+Screenshots from recorded runs (`Images/Task_Images/`). Each row is one task: image **a** first, then **b**–**e** below.
+
+#### CU-CALC — Calculator hotkeys (Layer 2a)
+
+![CU-CALC a](Images/Task_Images/1_a.png)
+
+| b | c | d | e |
+|:---:|:---:|:---:|:---:|
+| ![CU-CALC b](Images/Task_Images/1_b.png) | ![CU-CALC c](Images/Task_Images/1_c.png) | ![CU-CALC d](Images/Task_Images/1_d.png) | ![CU-CALC e](Images/Task_Images/1_e.png) |
+
+#### CU-AX-NOTE — Notepad AX note (Layer 2b)
+
+![CU-AX-NOTE a](Images/Task_Images/2_a.png)
+
+| b | c | d | e |
+|:---:|:---:|:---:|:---:|
+| ![CU-AX-NOTE b](Images/Task_Images/2_b.png) | ![CU-AX-NOTE c](Images/Task_Images/2_c.png) | ![CU-AX-NOTE d](Images/Task_Images/2_d.png) | ![CU-AX-NOTE e](Images/Task_Images/2_e.png) |
+
+#### CU-CURSOR — Cursor Electron page (Layer 2b)
+
+![CU-CURSOR a](Images/Task_Images/3_a.png)
+
+| b | c | d | e |
+|:---:|:---:|:---:|:---:|
+| ![CU-CURSOR b](Images/Task_Images/3_b.png) | ![CU-CURSOR c](Images/Task_Images/3_c.png) | ![CU-CURSOR d](Images/Task_Images/3_d.png) | ![CU-CURSOR e](Images/Task_Images/3_e.png) |
+
+#### CU-CANVAS — Canvas vision target (Layer 3)
+
+![CU-CANVAS a](Images/Task_Images/4_a.png)
+
+| b | c | d | e |
+|:---:|:---:|:---:|:---:|
+| ![CU-CANVAS b](Images/Task_Images/4_b.png) | ![CU-CANVAS c](Images/Task_Images/4_c.png) | ![CU-CANVAS d](Images/Task_Images/4_d.png) | ![CU-CANVAS e](Images/Task_Images/4_e.png) |
+
+#### CU-MSG — Message draft with verification (Layer 2b)
+
+![CU-MSG a](Images/Task_Images/5_a.png)
+
+| b | c | d | e |
+|:---:|:---:|:---:|:---:|
+| ![CU-MSG b](Images/Task_Images/5_b.png) | ![CU-MSG c](Images/Task_Images/5_c.png) | ![CU-MSG d](Images/Task_Images/5_d.png) | ![CU-MSG e](Images/Task_Images/5_e.png) |
+
+#### CU-MULTI — Multi-app Calculator → Notepad (Layer 2a)
+
+![CU-MULTI a](Images/Task_Images/6_a.png)
+
+| b | c | d | e |
+|:---:|:---:|:---:|:---:|
+| ![CU-MULTI b](Images/Task_Images/6_b.png) | ![CU-MULTI c](Images/Task_Images/6_c.png) | ![CU-MULTI d](Images/Task_Images/6_d.png) | ![CU-MULTI e](Images/Task_Images/6_e.png) |
+
 ### Icons & UI
 
 The web UI uses shadcn-style components, lucide-style SVG icons, and a consistent brand lockup (`app-icon.svg` in headers, chat welcome, and favicon).

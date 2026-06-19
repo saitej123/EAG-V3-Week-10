@@ -496,20 +496,39 @@ def _red_blob_center(image_url: str) -> tuple[int, int] | None:
     except Exception:
         return None
     pixels = im.load()
-    min_x = im.width
-    min_y = im.height
-    max_x = -1
-    max_y = -1
-    count = 0
+    red_pixels: set[tuple[int, int]] = set()
     for y in range(im.height):
         for x in range(im.width):
             r, g, b = pixels[x, y]
             if r >= 180 and g <= 90 and b <= 90 and r >= g * 2 and r >= b * 2:
-                min_x = min(min_x, x)
-                min_y = min(min_y, y)
-                max_x = max(max_x, x)
-                max_y = max(max_y, y)
-                count += 1
-    if count < 100 or max_x < min_x or max_y < min_y:
+                red_pixels.add((x, y))
+    if len(red_pixels) < 100:
         return None
+
+    visited: set[tuple[int, int]] = set()
+    best: list[tuple[int, int]] = []
+    for start in list(red_pixels):
+        if start in visited:
+            continue
+        stack = [start]
+        visited.add(start)
+        component: list[tuple[int, int]] = []
+        while stack:
+            x, y = stack.pop()
+            component.append((x, y))
+            for nxt in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if nxt in red_pixels and nxt not in visited:
+                    visited.add(nxt)
+                    stack.append(nxt)
+        if len(component) > len(best):
+            best = component
+
+    if len(best) < 100:
+        return None
+    xs = [x for x, _y in best]
+    ys = [y for _x, y in best]
+    min_x = min(xs)
+    min_y = min(ys)
+    max_x = max(xs)
+    max_y = max(ys)
     return (min_x + max_x) // 2, (min_y + max_y) // 2

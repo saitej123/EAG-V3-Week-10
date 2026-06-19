@@ -181,6 +181,10 @@ async def run_hotkey_script(
                 }
 
         result = _infer_result(actions, current_app)
+        if result == "hotkey script completed" and "calc" not in current_app.lower():
+            typed = _last_typed_text(actions)
+            if typed:
+                result = typed
         return {
             "success": bool(result) and result != "hotkey script completed",
             "result": result,
@@ -386,6 +390,16 @@ def _calc_button_index(snap: dict, ch: str) -> int | None:
                 if idx is not None:
                     return int(idx)
     return None
+
+
+def _last_typed_text(actions: list[dict]) -> str:
+    for act in reversed(actions):
+        if not isinstance(act, dict) or act.get("tool") != "type_text":
+            continue
+        args = act.get("args") or {}
+        if isinstance(args, dict) and args.get("text"):
+            return str(args["text"])
+    return ""
 
 
 def script_for_metadata(metadata: dict, app: str) -> list[dict[str, Any]]:

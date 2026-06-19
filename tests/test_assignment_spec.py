@@ -12,7 +12,7 @@ from computer_use_agent.flow import Graph
 from computer_use_agent.skills import SkillRegistry
 
 EXPECTED_BROWSER_IDS = {"COMP", "DEAL", "TICKET", "STACK", "FORGE", "B1", "B2", "B3", "B4"}
-EXPECTED_COMPUTER_IDS = {"CU-CALC", "CU-CURSOR", "CU-CANVAS"}
+EXPECTED_COMPUTER_IDS = {"CU-CALC", "CU-AX-NOTE", "CU-CURSOR", "CU-CANVAS", "CU-MSG", "CU-MULTI"}
 EXPECTED_IDS = EXPECTED_BROWSER_IDS | EXPECTED_COMPUTER_IDS
 
 
@@ -68,7 +68,7 @@ def test_computer_skill_registered():
 
 def test_assignment_payload():
     payload = assignment_payload()
-    assert payload["query_count"] == 12
+    assert payload["query_count"] == 15
     assert payload["log_dir"] == "logs/dag"
     design = payload.get("design_queries") or []
     assert len(design) == 2
@@ -82,7 +82,7 @@ def test_assignment_payload():
     assert outline[1]["query_ids"] == ["DEAL", "TICKET"]
     assert outline[2]["query_ids"] == ["STACK", "FORGE"]
     assert outline[3]["query_ids"] == ["B1", "B2", "B3", "B4"]
-    assert outline[4]["query_ids"] == ["CU-CALC", "CU-CURSOR", "CU-CANVAS"]
+    assert outline[4]["query_ids"] == ["CU-CALC", "CU-AX-NOTE", "CU-CURSOR", "CU-CANVAS", "CU-MSG", "CU-MULTI"]
 
 
 def test_assignment_corpus_validates():

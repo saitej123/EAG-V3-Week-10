@@ -13,7 +13,7 @@ from ..persistence import SessionStore
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SAFE_REL = re.compile(r"^[A-Za-z0-9._/-]+$")
-_COMPUTER_QUERY_RE = re.compile(r"^dag_(CU-[A-Z]+)_")
+_COMPUTER_QUERY_RE = re.compile(r"^dag_(CU-[A-Z-]+)_")
 _NOISE_TEXT_RE = re.compile(r"[\ufffc\ufeff\u200b-\u200f\u2028\u2029]")
 _WHITESPACE_RE = re.compile(r"\s+")
 
@@ -212,6 +212,9 @@ def _format_action_line(action: Any, index: int) -> str:
             for key in ("name", "text", "key", "element_index", "pid"):
                 if args.get(key) is not None:
                     arg_bits.append(f"{key}={args[key]!r}")
+        for key in ("text", "key", "element_index", "pid"):
+            if not arg_bits and action.get(key) is not None:
+                arg_bits.append(f"{key}={action[key]!r}")
         suffix = (" " + " ".join(arg_bits)) if arg_bits else ""
         return f"{index}. {tool}{suffix}"
     char = action.get("char")
@@ -509,11 +512,12 @@ def format_computer_replay_sections(report: dict[str, Any]) -> list[dict[str, An
 
 
 def replay_report_markdown(report: dict[str, Any]) -> str:
+    primary = _pick_primary_computer_run(report.get("computer_runs") or [])
     lines = [
         "# Computer-use trajectory evidence",
         "",
         f"**Session:** `{report.get('session_id', '')}`",
-        f"**Trajectory:** `{((report.get('computer_runs') or [{}])[0] or {}).get('trajectory_dir', '')}`",
+        f"**Trajectory:** `{primary.get('trajectory_dir', '')}`",
         "",
     ]
     for sec in format_computer_replay_sections(report):
